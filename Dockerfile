@@ -1,12 +1,20 @@
-FROM node:20
+# Stage 1: Build the app
+FROM node:20 AS build
 
 WORKDIR /app
 
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm ci
 
+# Copy the rest of the app
 COPY . .
 
-EXPOSE 5173  # Default port for Vite dev server
+# Build the app (use "build" for production, not "dev")
+RUN npm run dev
 
-CMD ["npm", "run", "dev"]
+
+# Expose port 80
+EXPOSE 80
