@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN npm run dev
 
 # Stage 2: Serve the app with Nginx
 FROM nginx:alpine
