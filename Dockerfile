@@ -1,12 +1,12 @@
-# Stage 1: Build the app
-FROM node:20 AS build
+FROM node:20
+
 WORKDIR /app
+
 COPY package*.json ./
 RUN npm ci
-COPY . .
-RUN npm run dev
 
-# Stage 2: Serve the app with Nginx
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+COPY . .
+
+EXPOSE 5173  # Default port for Vite dev server
+
+CMD ["npm", "run", "dev"]
