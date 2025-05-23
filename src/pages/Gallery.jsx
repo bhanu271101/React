@@ -81,7 +81,7 @@ console.log('imagesResponse.data:',productsResponse.data);
             return acc;
           }, {});
           setImagesMap(images);
-          console.log('imagesResponse.data:',imageResponse.data);
+          console.log('imagesResponse.data:',imagesResponse.data);
         }
       } catch (error) {
         console.error("Error fetching products or images:", error);
