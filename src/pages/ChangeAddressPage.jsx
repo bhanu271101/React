@@ -35,37 +35,36 @@ const ChangeAddressPage = () => {
   };
 
   useEffect(() => {
-    const fetchAddresses = async () => {
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-      try {
-        const response = await axios.get(`${User}/getAllAddresses`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        // Combine existing addresses with any new address from state
-        const allAddresses = location.state?.newAddress
-          ? [...response.data, location.state.newAddress]
-          : response.data;
-        setAddresses(allAddresses);
-        // Select default address or new address if just added
-        const defaultAddress = allAddresses.find(addr =>
-          location.state?.newAddress
-            ? addr.addressId === location.state.newAddress.addressId
-            : addr.isDefault
-        );
+  const fetchAddresses = async () => {
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    try {
+      const response = await axios.get(`${User}/getAllAddresses`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAddresses(response.data);
+
+      // Select the new address if just added, else default
+      if (location.state?.newAddress) {
+        setSelectedAddress(location.state.newAddress.addressId);
+      } else {
+        const defaultAddress = response.data.find(addr => addr.isDefault);
         if (defaultAddress) {
           setSelectedAddress(defaultAddress.addressId);
         }
-      } catch (err) {
-        setError('Failed to load addresses. Please try again.');
-      } finally {
-        setLoading(false);
       }
-    };
-    fetchAddresses();
-  }, [User, navigate, token, location.state]);
+    } catch (err) {
+      setError('Failed to load addresses. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchAddresses();
+}, [User, navigate, token, location.state]);
+
+
 
   const handleSetDefaultAddress = async () => {
     if (!selectedAddress) {

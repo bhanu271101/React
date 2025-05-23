@@ -63,13 +63,14 @@ const AddressPage = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      navigate("/changeaddress", {
-        state: {
-          ...location.state,
-          newAddress: response.data,
-          message: "Address added successfully!",
-        },
-      });
+     navigate("/changeaddress", {
+  state: {
+    ...location.state,
+    newAddress: response.data,
+    message: "Address added successfully!",
+  },
+});
+
     } catch (err) {
       setError(err.response?.data?.message || "Failed to save address");
       setSnackbarMessage(err.response?.data?.message || "Failed to save address");

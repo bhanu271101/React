@@ -42,6 +42,7 @@ const Gallery = () => {
   const Orders = import.meta.env.VITE_ORDERS;
 
   useEffect(() => {
+    // Axios interceptor for 401 Unauthorized handling
     const interceptor = axios.interceptors.response.use(
       response => response,
       error => {
@@ -62,29 +63,23 @@ const Gallery = () => {
       try {
         setLoading(true);
         setError(null);
-       const productsResponse = await axios.get(`${Product}/product/getAllProducts`, {
-      headers: {
-        'ngrok-skip-browser-warning': 'true'
-      }
-      
-    });    setProducts(productsResponse.data);
-    
-
+        const productsResponse = await axios.get(`${Product}/product/getAllProducts`, {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        setProducts(productsResponse.data);
 
         const mobileIds = productsResponse.data.map(product => product.mobileId);
         const query = mobileIds.map(id => `mobileId=${id}`).join('&');
-console.log('imagesResponse.data:',productsResponse.data);
         const imagesResponse = await axios.get(`${Product}/imagesByIds?${query}`);
+
         if (imagesResponse.data) {
           const images = imagesResponse.data.reduce((acc, image) => {
             acc[image.id] = image.image;
             return acc;
           }, {});
           setImagesMap(images);
-          console.log('imagesResponse.data:',imagesResponse.data);
         }
       } catch (error) {
-        console.error("Error fetching products or images:", error);
         if (error.response?.status !== 401) {
           setError("Failed to load products. Please try again later.");
         }
@@ -93,7 +88,7 @@ console.log('imagesResponse.data:',productsResponse.data);
       }
     };
     fetchProductsAndImages();
-  }, []);
+  }, [Product]);
 
   const handleCardClick = (id, image) => {
     navigate(`/product/${id}`, { state: { image } });
@@ -111,15 +106,9 @@ console.log('imagesResponse.data:',productsResponse.data);
       quantity: 1,
     };
     try {
-      const response = await axios.post(
-        `${Orders}/addToCart`,
-        cartDTO,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      await axios.post(`${Orders}/addToCart`, cartDTO, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setLastAddedProduct(product);
       setCartDialogOpen(true);
     } catch (error) {
@@ -146,7 +135,6 @@ console.log('imagesResponse.data:',productsResponse.data);
     setSnackbarOpen(false);
   };
 
-  // --- UI Starts Here ---
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
@@ -228,7 +216,12 @@ console.log('imagesResponse.data:',productsResponse.data);
                   alignItems: 'center',
                   overflow: "hidden"
                 }}
-                onClick={() => handleCardClick(product.mobileId, imagesMap[product.mobileId] ? `data:image/jpeg;base64,${imagesMap[product.mobileId]}` : 'https://via.placeholder.com/400x300?text=No+Image')}
+                onClick={() => handleCardClick(
+                  product.mobileId,
+                  imagesMap[product.mobileId]
+                    ? `data:image/jpeg;base64,${imagesMap[product.mobileId]}`
+                    : 'https://via.placeholder.com/400x300?text=No+Image'
+                )}
               >
                 <CardMedia
                   component="img"
@@ -239,11 +232,11 @@ console.log('imagesResponse.data:',productsResponse.data);
                     height: 'auto',
                     objectFit: 'scale-down',
                     transition: "transform 0.4s cubic-bezier(.25,.8,.25,1)",
-                    "&:hover": {
-                      transform: "scale(1.08)"
-                    }
+                    "&:hover": { transform: "scale(1.08)" }
                   }}
-                  image={imagesMap[product.mobileId] ? `data:image/jpeg;base64,${imagesMap[product.mobileId]}` : 'https://via.placeholder.com/400x300?text=No+Image'}
+                  image={imagesMap[product.mobileId]
+                    ? `data:image/jpeg;base64,${imagesMap[product.mobileId]}`
+                    : 'https://via.placeholder.com/400x300?text=No+Image'}
                   alt={product.mobileName}
                 />
               </Box>
@@ -377,7 +370,7 @@ console.log('imagesResponse.data:',productsResponse.data);
           </DialogActions>
         </Dialog>
 
-        {/* Error Snackbar */}
+        {/* Snackbar for errors and messages */}
         <Snackbar
           open={snackbarOpen}
           autoHideDuration={3000}

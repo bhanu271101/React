@@ -22,6 +22,7 @@ const OrderManagementDashboard = () => {
   });
   const [modalLoading, setModalLoading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
+  const Hub=import.meta.env.VITE_HUB;
 
   useEffect(() => {
     loadOrders();
@@ -31,7 +32,7 @@ const OrderManagementDashboard = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.get('http://localhost:8082/getAllOrders');
+      const response = await axios.get(`${Hub}/getAllOrders`);
       setOrders(response.data.map(item => item.orderDto));
     } catch (err) {
       console.error('Error loading orders:', err);
@@ -43,7 +44,7 @@ const OrderManagementDashboard = () => {
 
   const fetchTrackingDetails = async (orderId) => {
     try {
-      const response = await axios.get('http://localhost:8082/getTrackingDetails', {
+      const response = await axios.get(`${Hub}/getTrackingDetails`, {
         params: { orderId },
       });
       return response.data;
@@ -56,7 +57,7 @@ const OrderManagementDashboard = () => {
 
   const fetchTrackingEvents = async (trackingId) => {
     try {
-      const response = await axios.get('http://localhost:8082/getAllTrackingEvents', {
+      const response = await axios.get(`${Hub}/getAllTrackingEvents`, {
         params: { trackingId },
       });
       return response.data;
@@ -150,7 +151,7 @@ const OrderManagementDashboard = () => {
         orderId: currentOrder.orderId,
         orderStatus: selectedStatus,
       };
-      await axios.put('http://localhost:8082/updateOrderStatus', requestData);
+      await axios.put(`${Hub}/updateOrderStatus`, requestData);
       await loadOrders();
       await openStatusModal({ orderId: currentOrder.orderId });
     } catch (err) {

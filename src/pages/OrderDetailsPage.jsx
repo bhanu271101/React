@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -8,9 +8,6 @@ import {
   CardMedia,
   Card,
   Grid,
-  Chip,
-  Divider,
-  useTheme,
   CircularProgress,
   Dialog,
   DialogTitle,
@@ -20,37 +17,39 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  Divider,
   Paper,
+  Snackbar,
   Alert,
-  Snackbar
+  useTheme,
 } from "@mui/material";
 import {
   ArrowBack,
+  Delete,
   LocalShipping,
-  AssignmentReturn,
   CheckCircle,
   RadioButtonChecked,
   RadioButtonUnchecked,
-  Delete,
+  DoneAll,
   Cancel,
-  DoneAll
-} from '@mui/icons-material';
+  AssignmentReturn,
+} from "@mui/icons-material";
 import axios from "axios";
 import { DateTime } from "luxon";
 
-// Tracking Dialog Component
 const TrackingDialog = ({ open, onClose, trackingId }) => {
   const theme = useTheme();
   const [trackingEvents, setTrackingEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const Hub = import.meta.env.VITE_HUB;
 
   const formatTrackingDate = (dateString) => {
     if (!dateString) return "";
     try {
       const date = DateTime.fromISO(dateString, { zone: "Asia/Kolkata" });
       return date.toFormat("EEE, MMM d, h:mm a");
-    } catch (error) {
-      console.error("Error formatting date:", error);
+    } catch {
       return "";
     }
   };
@@ -59,11 +58,12 @@ const TrackingDialog = ({ open, onClose, trackingId }) => {
     const fetchTrackingEvents = async () => {
       try {
         const response = await axios.get(
-          `http://192.168.0.200:8082/getAllTrackingEvents?trackingId=${trackingId}`
+          `${Hub}/getAllTrackingEvents?trackingId=${trackingId}`
         );
-        setTrackingEvents(response.data);
+        setTrackingEvents(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error("Error fetching tracking events:", error);
+        setTrackingEvents([]);
       } finally {
         setLoading(false);
       }
@@ -72,13 +72,17 @@ const TrackingDialog = ({ open, onClose, trackingId }) => {
     if (open && trackingId) {
       fetchTrackingEvents();
     }
-  }, [open, trackingId]);
+  }, [open, trackingId, Hub]);
 
   const getStatusIcon = (event, index) => {
     if (index === 0) {
       return <RadioButtonChecked color="primary" />;
     }
-    return event.status ? <RadioButtonChecked color="primary" /> : <RadioButtonUnchecked />;
+    return event.status ? (
+      <RadioButtonChecked color="primary" />
+    ) : (
+      <RadioButtonUnchecked />
+    );
   };
 
   const getStatusText = (event) => {
@@ -112,7 +116,6 @@ const TrackingDialog = ({ open, onClose, trackingId }) => {
           </Button>
         </Box>
       </DialogTitle>
-      
       <DialogContent sx={{ py: 3 }}>
         {loading ? (
           <Box display="flex" justifyContent="center" py={4}>
@@ -120,23 +123,23 @@ const TrackingDialog = ({ open, onClose, trackingId }) => {
           </Box>
         ) : (
           <Paper elevation={0} sx={{ p: 2 }}>
-            <Box sx={{ mb: 3, p: 2, backgroundColor: '#f7f7f7', borderRadius: 1 }}>
+            <Box sx={{ mb: 3, p: 2, backgroundColor: "#f7f7f7", borderRadius: 1 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                 Tracking ID: {trackingId}
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
                 <CheckCircle color="primary" sx={{ mr: 1 }} />
                 <Typography variant="body1">
-                  {trackingEvents.length > 0 
+                  {trackingEvents.length > 0
                     ? `Last update: ${formatTrackingDate(trackingEvents[0].timestamp)}`
-                    : 'No tracking information available'}
+                    : "No tracking information available"}
                 </Typography>
               </Box>
             </Box>
 
-            <List sx={{ width: '100%' }}>
+            <List sx={{ width: "100%" }}>
               {trackingEvents.map((event, index) => (
-                <React.Fragment key={event.id}>
+                <React.Fragment key={event.id || index}>
                   <ListItem alignItems="flex-start" sx={{ px: 0 }}>
                     <ListItemAvatar sx={{ minWidth: 40 }}>
                       {getStatusIcon(event, index)}
@@ -176,7 +179,6 @@ const TrackingDialog = ({ open, onClose, trackingId }) => {
           </Paper>
         )}
       </DialogContent>
-      
       <DialogActions sx={{ borderTop: `1px solid ${theme.palette.divider}`, py: 2 }}>
         <Button onClick={onClose} variant="contained" fullWidth>
           Close
@@ -186,87 +188,110 @@ const TrackingDialog = ({ open, onClose, trackingId }) => {
   );
 };
 
-// Main Order Details Component
 const OrderDetailsPage = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
+
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [productImages, setProductImages] = useState([]);
+  const [imageSrc, setImageSrc] = useState(null);
   const [estimatedDelivery, setEstimatedDelivery] = useState(null);
-  const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
   const [trackingId, setTrackingId] = useState(null);
-  const [deliveryDate, setDeliveryDate] = useState(null);
   const [orderStatus, setOrderStatus] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
-    message: '',
-    severity: 'success'
+    message: "",
+    severity: "success",
   });
+
+  const Orders = import.meta.env.VITE_ORDERS;
+  const Product = import.meta.env.VITE_PRODUCT;
+  const Hub = import.meta.env.VITE_HUB;
 
   const formatAmazonDate = (dateString) => {
     if (!dateString) return "Date not available";
     try {
       const dateIST = DateTime.fromISO(dateString, { zone: "Asia/Kolkata" });
       return dateIST.toFormat("MMMM d, yyyy 'at' hh:mm a");
-    } catch (error) {
-      console.error("Error formatting date:", error);
+    } catch {
       return "Date not available";
     }
   };
 
   useEffect(() => {
-    const fetchOrderData = async () => {
+    const fetchOrderAndImageAndTracking = async () => {
+      setLoading(true);
       try {
-        // Fetch order details
-        const orderResponse = await axios.get(`${import.meta.env.VITE_ORDERS}/${orderId}`);
-        setOrder(orderResponse.data);
+        // Get order data from location state or API
+        let orderData = location.state?.order;
+        if (!orderData) {
+          const orderResponse = await axios.get(`${Orders}/${orderId}`);
+          orderData = orderResponse.data;
+        }
+        setOrder(orderData);
+
+        // Fetch image for this mobileId
+        if (orderData?.mobileId) {
+          const imagesResponse = await axios.get(
+            `${Product}/imagesByIds?mobileId=${orderData.mobileId}`
+          );
+          const imageObj = Array.isArray(imagesResponse.data)
+            ? imagesResponse.data.find((img) => img.id === orderData.mobileId)
+            : null;
+          if (imageObj && imageObj.image) {
+            setImageSrc(`data:image/jpeg;base64,${imageObj.image}`);
+          } else {
+            setImageSrc(null);
+          }
+        }
 
         // Fetch tracking details
-        const trackingResponse = await axios.get(`http://192.168.0.200:8082/getTrackingDetails?orderId=${orderId}`);
-        setEstimatedDelivery(trackingResponse.data.estmatedDeliveryTime);
-        setDeliveryDate(trackingResponse.data.deliveryDate);
-        setTrackingId(trackingResponse.data.trackingId);
-        setOrderStatus(trackingResponse.data.orderStatus);
-
-        // Fetch product images
-        const imagesResponse = await axios.get(
-          `${import.meta.env.VITE_PRODUCT}/imagesByIds?mobileId=${orderResponse.data.mobileId}`
-        );
-        if (imagesResponse.data.length > 0) {
-          const images = imagesResponse.data.map(img => `data:image/jpeg;base64,${img.image}`);
-          setProductImages(images);
-        } else {
-          setProductImages(orderResponse.data.imageUrl ? [orderResponse.data.imageUrl] : []);
+        try {
+          const trackingResponse = await axios.get(
+            `${Hub}/getTrackingDetails?orderId=${orderId}`
+          );
+          setEstimatedDelivery(trackingResponse.data.estmatedDeliveryTime || null);
+          setTrackingId(trackingResponse.data.trackingId || null);
+          setOrderStatus(trackingResponse.data.orderStatus || null);
+        } catch (error) {
+          console.error("Error fetching tracking details:", error);
+          setEstimatedDelivery(null);
+          setTrackingId(null);
+          setOrderStatus(null);
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        setOrder(null);
+        setImageSrc(null);
+        setEstimatedDelivery(null);
+        setTrackingId(null);
+        setOrderStatus(null);
+        console.error("Error fetching order or image:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchOrderData();
-  }, [orderId]);
+    fetchOrderAndImageAndTracking();
+  }, [orderId, Orders, Product, Hub, location.state]);
 
   const handleDeleteOrder = async () => {
     try {
-      await axios.delete(`${import.meta.env.VITE_ORDERS}/deleteOrder?orderId=${orderId}`);
+      await axios.delete(`${Orders}/deleteOrder?orderId=${orderId}`);
       setSnackbar({
         open: true,
-        message: 'Order deleted successfully',
-        severity: 'success'
+        message: "Order deleted successfully",
+        severity: "success",
       });
       setTimeout(() => navigate("/orderspage"), 1500);
     } catch (error) {
-      console.error("Error deleting order:", error);
       setSnackbar({
         open: true,
-        message: 'Failed to delete order. Please try again.',
-        severity: 'error'
+        message: "Failed to delete order. Please try again.",
+        severity: "error",
       });
     } finally {
       setDeleteConfirmOpen(false);
@@ -274,17 +299,19 @@ const OrderDetailsPage = () => {
   };
 
   const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
+    setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
   if (loading) {
     return (
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '60vh'
-      }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "60vh",
+        }}
+      >
         <CircularProgress size={60} />
       </Box>
     );
@@ -296,11 +323,7 @@ const OrderDetailsPage = () => {
         <Typography variant="h6" color="error" gutterBottom>
           Order not found.
         </Typography>
-        <Button 
-          variant="contained" 
-          onClick={() => navigate("/orderspage")}
-          sx={{ mt: 2 }}
-        >
+        <Button variant="contained" onClick={() => navigate("/orderspage")} sx={{ mt: 2 }}>
           Back to Orders
         </Button>
       </Container>
@@ -309,297 +332,168 @@ const OrderDetailsPage = () => {
 
   const isDelivered = orderStatus === "Delivered";
   const isCancelled = orderStatus === "Cancelled";
-  const isReturned = orderStatus === "Retruned";
+  const isReturned = orderStatus === "Returned";
 
   return (
-    <Container maxWidth="lg" sx={{ py: 2 }}>
+    <Container maxWidth="md" sx={{ py: 2 }}>
       <Button
         startIcon={<ArrowBack />}
         onClick={() => navigate("/orderspage")}
-        sx={{ 
-          mb: 2, 
-          textTransform: 'none',
-          color: theme.palette.text.primary,
-          '&:hover': {
-            backgroundColor: 'rgba(0, 0, 0, 0.04)'
-          }
+        sx={{
+          mb: 2,
+          textTransform: "none",
         }}
       >
         Back to Orders
       </Button>
 
-      {/* Order Header Section */}
-      <Box sx={{ 
-        mb: 3, 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 2
-      }}>
-        <Box>
-          <Typography variant="h5" sx={{ 
-            fontWeight: 600,
-            color: theme.palette.text.primary
-          }}>
-            Order #{order.orderId}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Placed on {formatAmazonDate(order.orderDate || order.createdAt)}
-          </Typography>
-        </Box>
-        {/* Only show Cancel Order button if order is not delivered, cancelled, or returned */}
-        {!isDelivered && !isCancelled && !isReturned && (
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<Delete />}
-            onClick={() => setDeleteConfirmOpen(true)}
-            sx={{ 
-              textTransform: 'none',
-              '&:hover': {
-                backgroundColor: 'rgba(211, 47, 47, 0.04)'
-              }
-            }}
-          >
-            Cancel Order
-          </Button>
-        )}
-      </Box>
+      <Card sx={{ p: 3, mb: 4, borderRadius: "8px" }}>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          Order #{order.orderId}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Placed on {formatAmazonDate(order.orderDate || order.createdAt)}
+        </Typography>
 
-      {/* Order Status Card */}
-      <Card sx={{ 
-        p: 3, 
-        mb: 4, 
-        borderLeft: `4px solid ${
-          isDelivered ? theme.palette.success.main : 
-          isCancelled ? theme.palette.error.main :
-          isReturned ? theme.palette.warning.main :
-          theme.palette.primary.main
-        }`,
-        boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-        borderRadius: '8px'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-          {isDelivered ? (
-            <DoneAll color="success" sx={{ mr: 1.5, fontSize: '28px' }} />
-          ) : isCancelled ? (
-            <Cancel color="error" sx={{ mr: 1.5, fontSize: '28px' }} />
-          ) : isReturned ? (
-            <AssignmentReturn color="warning" sx={{ mr: 1.5, fontSize: '28px' }} />
-          ) : (
-            <CheckCircle color="primary" sx={{ mr: 1.5, fontSize: '28px' }} />
-          )}
-          
-          <Box>
-            <Typography variant="h6" sx={{ 
-              fontWeight: 600,
-              color: theme.palette.text.primary
-            }}>
-              {isDelivered ? 'Delivered' : 
-               isCancelled ? 'Cancelled' : 
-               isReturned ? 'Returned' :
-               orderStatus || 'Order Confirmed'}
-            </Typography>
-            
-            <Typography variant="body2" sx={{ 
-              color: isDelivered ? theme.palette.success.dark :
-                     isCancelled ? theme.palette.error.dark :
-                     isReturned ? theme.palette.warning.dark :
-                     theme.palette.text.secondary,
-              mt: 0.5
-            }}>
-              {isDelivered ? (
-                `Delivered on ${deliveryDate ? formatAmazonDate(deliveryDate) : formatAmazonDate(estimatedDelivery)}`
-              ) : isCancelled ? (
-                `Cancelled on ${formatAmazonDate(estimatedDelivery)}`
-              ) : isReturned ? (
-                `Returned on ${formatAmazonDate(estimatedDelivery)}`
-              ) : estimatedDelivery ? (
-                `Expected delivery: ${formatAmazonDate(estimatedDelivery)}`
-              ) : (
-                "Delivery date will be updated soon"
-              )}
-            </Typography>
-          </Box>
-        </Box>
-
-        {!isDelivered && !isCancelled && !isReturned && trackingId && (
-          <Button
-            variant="outlined"
-            startIcon={<LocalShipping />}
-            onClick={() => setTrackingDialogOpen(true)}
-            sx={{
-              mt: 2,
-              textTransform: 'none',
-              borderColor: theme.palette.primary.main,
-              color: theme.palette.primary.main,
-              '&:hover': {
-                backgroundColor: 'rgba(25, 118, 210, 0.04)'
-              }
-            }}
-          >
-            Track Package
-          </Button>
-        )}
-      </Card>
-
-      {/* Product Details Section */}
-      <Grid container spacing={3}>
-        {/* Product Images Column */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ 
-            p: 2, 
-            height: '100%',
-            borderRadius: '8px',
-            boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)'
-          }}>
-            {productImages.length > 0 ? (
-              <>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={4}>
+            <Box
+              sx={{
+                width: "100%",
+                height: 250,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#fafafa",
+                borderRadius: 2,
+                boxShadow: 1,
+              }}
+            >
+              {imageSrc ? (
                 <CardMedia
                   component="img"
-                  image={productImages[selectedImage]}
+                  image={imageSrc}
                   alt={order.mobileName}
                   sx={{
-                    width: '100%', 
-                    height: 300,
-                    objectFit: 'contain',
-                    mb: 2,
-                    borderRadius: '4px'
+                    width: "auto",
+                    height: "100%",
+                    maxWidth: "100%",
+                    objectFit: "contain",
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = "none";
                   }}
                 />
-                
-                {/* Thumbnail Gallery */}
-                <Box sx={{ 
-                  display: 'flex', 
-                  gap: 1, 
-                  overflowX: 'auto',
-                  py: 1,
-                  '&::-webkit-scrollbar': {
-                    height: '6px'
-                  },
-                  '&::-webkit-scrollbar-thumb': {
-                    backgroundColor: theme.palette.grey[400],
-                    borderRadius: '3px'
-                  }
-                }}>
-                  {productImages.map((img, index) => (
-                    <Box
-                      key={index}
-                      onClick={() => setSelectedImage(index)}
-                      sx={{
-                        width: 60,
-                        height: 60,
-                        border: selectedImage === index ? `2px solid ${theme.palette.primary.main}` : '1px solid #ddd',
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        boxShadow: selectedImage === index ? "0 2px 8px rgba(25, 118, 210, 0.18)" : undefined,
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      <CardMedia
-                        component="img"
-                        image={img}
-                        alt={`Thumbnail ${index + 1}`}
-                        sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      />
-                    </Box>
-                  ))}
-                </Box>
-              </>
-            ) : (
-              <Box
-                sx={{
-                  width: '100%',
-                  height: 300,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#f7f7f7',
-                  borderRadius: 2
-                }}
-              >
+              ) : (
                 <Typography variant="body2" color="text.secondary">
                   No image available
                 </Typography>
-              </Box>
-            )}
-          </Card>
-        </Grid>
+              )}
+            </Box>
+          </Grid>
 
-        {/* Product Info Column */}
-        <Grid item xs={12} md={8}>
-          <Card sx={{ 
-            p: 3, 
-            borderRadius: '8px',
-            boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)'
-          }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+          <Grid item xs={12} md={8}>
+            <Typography variant="h6" gutterBottom>
               {order.mobileName}
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body1" color="text.secondary" paragraph>
               {order.description || "No description available."}
             </Typography>
-            <Divider sx={{ my: 2 }} />
-            <Grid container spacing={2}>
-              <Grid item xs={6} sm={4}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Price
-                </Typography>
-                <Typography variant="h6" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>
-                  ₹{order.price?.toLocaleString()}
-                </Typography>
-              </Grid>
-              <Grid item xs={6} sm={4}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Quantity
-                </Typography>
-                <Chip label={order.quantity} color="primary" variant="outlined" />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Total
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  ₹{(order.price * order.quantity)?.toLocaleString()}
-                </Typography>
-              </Grid>
-            </Grid>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-              Shipping Address
+            <Typography variant="body1" sx={{ fontWeight: 600, mt: 2 }}>
+              ₹{order.price?.toLocaleString("en-IN") || "N/A"}
             </Typography>
-            <Typography variant="body2" sx={{ color: "#222", mb: 0.5 }}>
-              {order.address?.userName}
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Quantity: {order.quantity}
             </Typography>
-            <Typography variant="body2" sx={{ color: "#555" }}>
-              {order.address?.houseNumber}, {order.address?.streetName}, {order.address?.city}, {order.address?.district}, {order.address?.state} - {order.address?.pincode}
-            </Typography>
-            <Typography variant="body2" sx={{ color: "#555", mt: 0.5 }}>
-              Phone: {order.address?.phoneNumber}
-            </Typography>
-          </Card>
+            {order.address && (
+              <Typography variant="body2" paragraph sx={{ mt: 2, color: "#555" }}>
+                <strong>Delivery Address:</strong>{" "}
+                {[order.address.houseNumber, order.address.streetName, order.address.city, order.address.state, order.address.pincode]
+                  .filter(Boolean)
+                  .join(", ")}
+              </Typography>
+            )}
+
+            {/* Order Status and Expected Delivery */}
+            <Box
+              sx={{
+                mt: 3,
+                p: 2,
+                borderRadius: 2,
+                backgroundColor: theme.palette.grey[100],
+              }}
+            >
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                Order Status:{" "}
+                <Box
+                  component="span"
+                  sx={{
+                    color: isDelivered
+                      ? theme.palette.success.main
+                      : isCancelled
+                      ? theme.palette.error.main
+                      : isReturned
+                      ? theme.palette.warning.main
+                      : theme.palette.text.primary,
+                    fontWeight: 700,
+                  }}
+                >
+                  {orderStatus || "Processing"}
+                </Box>
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {estimatedDelivery
+                  ? `Expected Delivery: ${formatAmazonDate(estimatedDelivery)}`
+                  : "Expected delivery date not available"}
+              </Typography>
+
+              {/* Show Track Package button only if order is active and trackingId exists */}
+              {!isDelivered && !isCancelled && !isReturned && trackingId && (
+                <Button
+                  variant="outlined"
+                  startIcon={<LocalShipping />}
+                  onClick={() => setTrackingDialogOpen(true)}
+                  sx={{
+                    mt: 2,
+                    textTransform: "none",
+                    borderColor: theme.palette.primary.main,
+                    color: theme.palette.primary.main,
+                    "&:hover": {
+                      backgroundColor: "rgba(25, 118, 210, 0.04)",
+                    },
+                  }}
+                >
+                  Track Package
+                </Button>
+              )}
+            </Box>
+
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<Delete />}
+              onClick={() => setDeleteConfirmOpen(true)}
+              sx={{
+                mt: 3,
+                textTransform: "none",
+              }}
+            >
+              Cancel Order
+            </Button>
+          </Grid>
         </Grid>
-      </Grid>
+      </Card>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
-        maxWidth="xs"
-        PaperProps={{ sx: { borderRadius: 2 } }}
-      >
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
         <DialogTitle>Cancel Order</DialogTitle>
         <DialogContent>
           <Typography>Are you sure you want to cancel this order?</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)} color="primary">
-            No
-          </Button>
-          <Button onClick={handleDeleteOrder} color="error" variant="contained">
-            Yes, Cancel Order
+          <Button onClick={() => setDeleteConfirmOpen(false)}>No</Button>
+          <Button color="error" onClick={handleDeleteOrder}>
+            Yes, Cancel
           </Button>
         </DialogActions>
       </Dialog>
@@ -611,7 +505,7 @@ const OrderDetailsPage = () => {
         trackingId={trackingId}
       />
 
-      {/* Snackbar */}
+      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
@@ -621,7 +515,7 @@ const OrderDetailsPage = () => {
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          sx={{ width: '100%', borderRadius: 2 }}
+          sx={{ width: "100%" }}
         >
           {snackbar.message}
         </Alert>
