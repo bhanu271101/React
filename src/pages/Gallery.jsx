@@ -137,16 +137,50 @@ const Gallery = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+        sx={{
+          background: `linear-gradient(270deg, #667eea, #764ba2, #5e35b1, #4527a0)`,
+          backgroundSize: "800% 800%",
+          animation: "gradientShift 20s ease infinite",
+        }}
+      >
         <CircularProgress size={60} />
+        <style>{`
+          @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+        `}</style>
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+        sx={{
+          background: `linear-gradient(270deg, #667eea, #764ba2, #5e35b1, #4527a0)`,
+          backgroundSize: "800% 800%",
+          animation: "gradientShift 20s ease infinite",
+        }}
+      >
         <Typography color="error" variant="h6">{error}</Typography>
+        <style>{`
+          @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+        `}</style>
       </Box>
     );
   }
@@ -155,26 +189,29 @@ const Gallery = () => {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%)",
+        background: `linear-gradient(270deg, #667eea, #764ba2, #5e35b1, #4527a0)`,
+        backgroundSize: "800% 800%",
+        animation: "gradientShift 20s ease infinite",
         py: 4,
       }}
     >
       <Container maxWidth="lg">
-        <Typography
-          variant="h3"
-          component="h1"
-          gutterBottom
-          sx={{
-            fontWeight: 'bold',
-            textAlign: 'center',
-            mb: 5,
-            color: "#341f97",
-            letterSpacing: 1,
-            textShadow: "1px 1px 8px #fff9"
-          }}
-        >
-          Our Latest Collection
-        </Typography>
+       <Typography
+  variant="h3"
+  component="h1"
+  gutterBottom
+  sx={{
+    fontWeight: 'bold',
+    textAlign: 'center',
+    mb: 5,
+    color: "#fff", // Pure white for best contrast
+    letterSpacing: 1,
+    textShadow: "0 2px 16px #4527a0, 0 1px 1px #2228" // Subtle purple and dark shadow for glow
+  }}
+>
+  Our Latest Collection
+</Typography>
+
 
         <Box sx={{
           display: 'grid',
@@ -194,13 +231,13 @@ const Gallery = () => {
                 overflow: 'hidden',
                 height: '100%',
                 maxWidth: 320,
-                background: "rgba(255,255,255,0.75)",
-                boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.18)",
+                background: "rgba(255,255,255,0.93)",
+                boxShadow: "0 8px 32px 0 rgba(101, 81, 255, 0.17)",
                 backdropFilter: "blur(4.5px)",
                 border: "1px solid rgba(255,255,255,0.15)",
                 "&:hover": {
                   transform: 'translateY(-8px) scale(1.03)',
-                  boxShadow: "0 16px 40px 0 rgba(31, 38, 135, 0.25)"
+                  boxShadow: "0 16px 40px 0 rgba(101, 81, 255, 0.24)"
                 }
               }}
             >
@@ -251,7 +288,7 @@ const Gallery = () => {
                   WebkitBoxOrient: 'vertical',
                   fontSize: '1.08rem',
                   mb: 1,
-                  color: "#222"
+                  color: "#4527a0"
                 }}>
                   {product.mobileName}
                 </Typography>
@@ -259,7 +296,7 @@ const Gallery = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                   <Typography variant="h6" sx={{
                     fontWeight: 'bold',
-                    color: "#5f27cd",
+                    color: "#5e35b1",
                     fontSize: '1.13rem'
                   }}>
                     ₹{product.price.toLocaleString()}
@@ -274,7 +311,6 @@ const Gallery = () => {
                   )}
                 </Box>
               </CardContent>
-
               <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                 <Button
                   variant="contained"
@@ -284,14 +320,15 @@ const Gallery = () => {
                   onClick={() => handleAddToCart(product)}
                   sx={{
                     textTransform: 'none',
-                    background: "linear-gradient(90deg, #43cea2 0%, #185a9d 100%)",
+                    background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
                     fontWeight: 600,
                     fontSize: '1rem',
                     py: 1.2,
                     borderRadius: "14px",
-                    boxShadow: "0 4px 20px 0 rgba(67,206,162,0.10)",
+                    boxShadow: "0 4px 20px 0 rgba(101, 81, 255, 0.10)",
+                    color: "#fff",
                     "&:hover": {
-                      background: "linear-gradient(90deg, #185a9d 0%, #43cea2 100%)"
+                      background: "linear-gradient(90deg, #5e35b1 0%, #4527a0 100%)"
                     }
                   }}
                 >
@@ -324,11 +361,11 @@ const Gallery = () => {
         >
           <DialogTitle id="cart-dialog-title" sx={{ p: 0, mb: 2, textAlign: "center" }}>
             <Stack alignItems="center" mb={1}>
-              <Avatar sx={{ bgcolor: "#43cea2", width: 48, height: 48 }}>
+              <Avatar sx={{ bgcolor: "#5e35b1", width: 48, height: 48 }}>
                 <CheckCircle fontSize="large" sx={{ color: "#fff" }} />
               </Avatar>
             </Stack>
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: "#4527a0" }}>
               Item Added to Cart
             </Typography>
           </DialogTitle>
@@ -358,10 +395,11 @@ const Gallery = () => {
                 borderRadius: '8px',
                 px: 3,
                 py: 1,
-                background: "linear-gradient(90deg, #43cea2 0%, #185a9d 100%)",
+                background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
                 fontWeight: 600,
+                color: "#fff",
                 "&:hover": {
-                  background: "linear-gradient(90deg, #185a9d 0%, #43cea2 100%)"
+                  background: "linear-gradient(90deg, #5e35b1 0%, #4527a0 100%)"
                 }
               }}
             >
@@ -384,13 +422,26 @@ const Gallery = () => {
             sx={{
               width: '100%',
               borderRadius: "10px",
-              boxShadow: "0 2px 8px rgba(67,206,162,0.15)"
+              boxShadow: "0 2px 8px rgba(101, 81, 255, 0.15)"
             }}
           >
             {snackbarMessage}
           </Alert>
         </Snackbar>
       </Container>
+      <style>{`
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes fadeInUp {
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </Box>
   );
 };

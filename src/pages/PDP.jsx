@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
 import {
   Box,
   Typography,
@@ -13,41 +13,42 @@ import {
   Slide,
   Alert,
   Grid,
-  useTheme,
-  CircularProgress
-} from '@mui/material';
-import {
-  ShoppingCart,
-  FlashOn,
-  ArrowBack
-} from '@mui/icons-material';
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Avatar,
+  CircularProgress,
+} from "@mui/material";
+import { ShoppingCart, FlashOn, ArrowBack, CheckCircle } from "@mui/icons-material";
 
 const PDP = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { state } = useLocation();
-  const theme = useTheme();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [productImage, setProductImage] = useState(state?.image);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [addressLoading, setAddressLoading] = useState(false);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [cartDialogOpen, setCartDialogOpen] = useState(false);
 
-  const User = import.meta.env.VITE_USER;
+  const [lastAddedProduct, setLastAddedProduct] = useState(null);
+
   const Product = import.meta.env.VITE_PRODUCT;
   const Orders = import.meta.env.VITE_ORDERS;
+  const User = import.meta.env.VITE_USER;
 
-  // Mock product images gallery
   const productImages = [
     productImage || "https://via.placeholder.com/600x800?text=Product+Image",
     "https://via.placeholder.com/600x800?text=Side+View",
     "https://via.placeholder.com/600x800?text=Back+View",
-    "https://via.placeholder.com/600x800?text=Detail+View"
+    "https://via.placeholder.com/600x800?text=Detail+View",
   ];
 
   useEffect(() => {
@@ -56,127 +57,16 @@ const PDP = () => {
         const response = await axios.get(`${Product}/product/getProductById/${id}`);
         setProduct(response.data);
         setProductImage(response.data.imageUrl || productImage);
-      } catch (error) {
-        console.error("Error fetching product data", error);
+      } catch {
+        setSnackbarMessage("Error fetching product data");
+        setSnackbarSeverity("error");
+        setSnackbarOpen(true);
       } finally {
         setLoading(false);
       }
     };
-    if (id) {
-      fetchProduct();
-    }
+    if (id) fetchProduct();
   }, [id, productImage]);
-
-  const checkDefaultAddress = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/login", { 
-        state: { 
-          message: "Please log in to continue",
-          from: window.location.pathname 
-        } 
-      });
-      return null;
-    }
-  
-    try {
-      setAddressLoading(true);
-      const response = await axios.get(`${User}/getDefaultAddress`, {
-        headers: { Authorization: `Bearer ${token}` },
-        validateStatus: function (status) {
-          return (status >= 200 && status < 300) || status === 401 || status === 404;
-        }
-      });
-  
-      if (response.status === 401) {
-        throw new Error("SESSION_EXPIRED");
-      }
-      if (response.status === 404) {
-        return null;
-      }
-      return response.data;
-    } catch (error) {
-      console.error("Error during fetching address:", error);
-      if (error.message === "SESSION_EXPIRED" || 
-          error.response?.status === 401 ||
-          error.response?.data?.message?.includes("session expired")) {
-        localStorage.removeItem("token");
-        navigate("/login", { 
-          state: { 
-            message: "Your session has expired. Please log in again.",
-            from: window.location.pathname
-          } 
-        });
-        return null;
-      }
-      showSnackbar(
-        error.response?.data?.message || "Failed to fetch address. Please try again.",
-        "error"
-      );
-      return null;
-    } finally {
-      setAddressLoading(false);
-    }
-  };
-  
-  const handleBuyNow = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/login", { 
-        state: { 
-          message: "Please log in to continue",
-          from: window.location.pathname
-        } 
-      });
-      return;
-    }
-    try {
-      const address = await checkDefaultAddress();
-      if (address === null) {
-        navigate("/addAddress", { 
-          state: { 
-            from: `/product/${id}`,
-            message: "Please set a default address to complete your purchase",
-            product: { 
-              mobileId: id, 
-              quantity: 1 
-            }
-          } 
-        });
-        return;
-      }
-      const productData = {
-        mobileId: id,
-        mobileName: product?.name || 'Product',
-        price: product?.price || 0,
-        quantity: 1,
-        image: product?.images?.[0] || product?.imageUrl || '/default-product-image.jpg'
-      };
-      navigate("/payment", {
-        state: {
-          product: productData,
-          address: address,
-          from: window.location.pathname
-        }
-      });
-    } catch (error) {
-      console.error("Error during purchase:", error);
-      if (error.response?.status === 401) {
-        localStorage.removeItem("token");
-        navigate("/login", { 
-          state: { 
-            message: "Your session expired during checkout. Please log in again.",
-            from: window.location.pathname
-          } 
-        });
-        return;
-      }
-      showSnackbar(
-        error.response?.data?.message || "Failed to proceed to payment. Please try again.",
-        "error"
-      );
-    }
-  };
 
   const handleAddToCart = async () => {
     const token = localStorage.getItem("token");
@@ -184,52 +74,104 @@ const PDP = () => {
       navigate("/login");
       return;
     }
+    const cartDTO = {
+      mobileId: id,
+      mobileName: product?.mobileName,
+      quantity,
+    };
     try {
-      await axios.post(
-        `${Orders}/addToCart`,
-        {
-          mobileId: product.mobileId,
-          mobileName: product.mobileName,
-          quantity: quantity,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      showSnackbar("Item added to cart!", "success");
-    } catch (error) {
-      console.error("Error adding to cart:", error);
-      if (error.response?.status === 401) {
-        localStorage.removeItem("token");
-        navigate("/login", { state: { message: "Session expired. Please log in again." } });
-        return;
-      }
-      showSnackbar(
-        error.response?.data?.message || "Failed to add item to cart. Please try again.",
-        "error"
-      );
+      await axios.post(`${Orders}/addToCart`, cartDTO, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setLastAddedProduct(product);
+      setCartDialogOpen(true);
+    } catch {
+      setSnackbarMessage("Failed to add item to cart. Please try again.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
     }
   };
+const handleBuyNow = async () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    navigate("/login");
+    return;
+  }
 
-  const showSnackbar = (message, severity = "success") => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(true);
+  // Prepare product details consistently
+  const productDetails = {
+    mobileId: id,
+    mobileName: product?.mobileName,
+    price: product?.price,
+    discount: product?.discount,
+    description: product?.description,
+    image: productImage || product?.imageUrl, // Fallback to product.imageUrl if productImage is null
+    quantity,
+    actionType: "buy", // This indicates it's a buy-now flow
   };
 
-  const handleCloseSnackbar = (_, reason) => {
-    if (reason === "clickaway") return;
-    setSnackbarOpen(false);
-  };
+  try {
+    // Attempt to get default address
+    const addressRes = await axios.get(`${User}/getDefaultAddress`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    if (addressRes.data) {
+      // Address exists - go directly to payment
+      navigate("/payment", { 
+        state: { 
+          product: productDetails, 
+          address: addressRes.data 
+        } 
+      });
+    } else {
+      // No address - go to add address with product details
+      navigate("/addaddress", { 
+        state: { 
+          product: productDetails,
+          redirectTo: "/payment", // Tell addaddress where to go after saving
+          requireAddress: true // Explicit flag that address is required
+        } 
+      });
+    }
+  } catch (error) {
+    // API failed or no address - go to add address
+    navigate("/addaddress", { 
+      state: { 
+        product: productDetails,
+        redirectTo: "/payment",
+        requireAddress: true
+      } 
+    });
+  }
+};
 
   const handleQuantityChange = (newQuantity) => {
-    if (newQuantity < 1) return;
-    if (newQuantity > 10) return;
+    if (newQuantity < 1 || newQuantity > 10) return;
     setQuantity(newQuantity);
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+        sx={{
+          background: `linear-gradient(270deg, #667eea, #764ba2, #5e35b1, #4527a0)`,
+          backgroundSize: "800% 800%",
+          animation: "gradientShift 20s ease infinite",
+        }}
+      >
         <CircularProgress size={60} />
+        <style>{`
+          @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+        `}</style>
       </Box>
     );
   }
@@ -248,39 +190,38 @@ const PDP = () => {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(120deg, #f6d365 0%, #fda085 100%)",
+        background: `linear-gradient(270deg, #667eea 0%, #764ba2 100%)`,
         py: 4,
       }}
     >
       <Container maxWidth="lg">
-        <Button 
-          startIcon={<ArrowBack />} 
+        <Button
+          startIcon={<ArrowBack />}
           onClick={() => navigate(-1)}
           sx={{
             mb: 3,
             background: "rgba(255,255,255,0.7)",
             borderRadius: 2,
             fontWeight: 600,
-            color: "#ff6f00",
+            color: "#5e35b1",
             "&:hover": {
               background: "rgba(255,255,255,0.9)",
-              color: "#ff9800"
-            }
+              color: "#4527a0",
+            },
           }}
         >
           Back to Products
         </Button>
-
         <Grid container spacing={4}>
           {/* Product Images */}
           <Grid item xs={12} md={6}>
             <Card
               sx={{
                 borderRadius: 4,
-                overflow: 'hidden',
-                background: "rgba(255,255,255,0.7)",
-                boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.18)",
-                backdropFilter: "blur(3px)"
+                overflow: "hidden",
+                background: "rgba(255,255,255,0.93)",
+                boxShadow: "0 8px 32px 0 rgba(101, 81, 255, 0.17)",
+                backdropFilter: "blur(3px)",
               }}
             >
               <CardMedia
@@ -288,18 +229,16 @@ const PDP = () => {
                 image={productImages[selectedImage]}
                 alt={product.mobileName}
                 sx={{
-                  width: '100%',
-                  height: 'auto',
+                  width: "100%",
+                  height: "auto",
                   maxHeight: 500,
-                  objectFit: 'contain',
+                  objectFit: "contain",
                   p: 2,
-                  backgroundColor: '#f9f9f9'
+                  backgroundColor: "#f9f9f9",
                 }}
               />
             </Card>
-            
-            {/* Thumbnail Gallery */}
-            <Box sx={{ display: 'flex', gap: 2, mt: 2, overflowX: 'auto', py: 1 }}>
+            <Box sx={{ display: "flex", gap: 2, mt: 2, overflowX: "auto", py: 1 }}>
               {productImages.map((img, index) => (
                 <Box
                   key={index}
@@ -307,20 +246,21 @@ const PDP = () => {
                   sx={{
                     width: 80,
                     height: 80,
-                    border: selectedImage === index ? `2.5px solid #ff9800` : '1px solid #ddd',
+                    border: selectedImage === index ? `2.5px solid #5e35b1` : "1px solid #ddd",
                     borderRadius: 2,
-                    overflow: 'hidden',
-                    cursor: 'pointer',
+                    overflow: "hidden",
+                    cursor: "pointer",
                     flexShrink: 0,
-                    boxShadow: selectedImage === index ? "0 4px 20px 0 rgba(255,152,0,0.22)" : undefined,
-                    transition: "all 0.2s"
+                    boxShadow:
+                      selectedImage === index ? "0 4px 20px 0 rgba(101,81,255,0.22)" : undefined,
+                    transition: "all 0.2s",
                   }}
                 >
                   <CardMedia
                     component="img"
                     image={img}
                     alt={`Thumbnail ${index + 1}`}
-                    sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    sx={{ width: "100%", height: "100%", objectFit: "contain" }}
                   />
                 </Box>
               ))}
@@ -330,43 +270,51 @@ const PDP = () => {
           {/* Product Details */}
           <Grid item xs={12} md={6}>
             <Box sx={{ mb: 3 }}>
-              <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1, color: "#ff9800" }}>
+              <Typography
+                variant="h4"
+                component="h1"
+                sx={{ fontWeight: 700, mb: 1, color: "#4527a0", textShadow: "0 2px 16px #fff9" }}
+              >
                 {product.mobileName}
               </Typography>
             </Box>
-            <Box sx={{
-              background: "rgba(255,255,255,0.85)",
-              p: 3,
-              borderRadius: 3,
-              mb: 3,
-              boxShadow: "0 4px 24px 0 rgba(255,152,0,0.08)"
-            }}>
+            <Box
+              sx={{
+                background: "rgba(255,255,255,0.85)",
+                p: 3,
+                borderRadius: 3,
+                mb: 3,
+                boxShadow: "0 4px 24px 0 rgba(101,81,255,0.08)",
+              }}
+            >
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: "#333" }}>
                 Product Description
               </Typography>
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-line', color: "#333" }}>
-                {product.description || 'No description available for this product.'}
+              <Typography variant="body1" sx={{ whiteSpace: "pre-line", color: "#333" }}>
+                {product.description || "No description available for this product."}
               </Typography>
             </Box>
 
-            <Box sx={{
-              background: "rgba(255,255,255,0.90)",
-              p: 3,
-              borderRadius: 3,
-              mb: 3,
-              boxShadow: "0 2px 12px 0 rgba(255,152,0,0.06)"
-            }}>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: "#ff9800", mb: 2 }}>
-                ₹{product.price.toLocaleString()}
+            <Box
+              sx={{
+                background: "rgba(255,255,255,0.90)",
+                p: 3,
+                borderRadius: 3,
+                mb: 3,
+                boxShadow: "0 2px 12px 0 rgba(101,81,255,0.06)",
+              }}
+            >
+              <Typography variant="h4" sx={{ fontWeight: 700, color: "#5e35b1", mb: 2 }}>
+                ₹{product.price?.toLocaleString()}
                 {product.discount && (
                   <Typography
                     component="span"
                     variant="h6"
                     sx={{
                       fontWeight: 500,
-                      color: 'error.main',
-                      fontSize: '1rem',
-                      ml: 1
+                      color: "error.main",
+                      fontSize: "1rem",
+                      ml: 1,
                     }}
                   >
                     ({product.discount}% OFF)
@@ -377,7 +325,7 @@ const PDP = () => {
                 Inclusive of all taxes
               </Typography>
 
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
                 <Typography variant="body1" sx={{ mr: 2, color: "#333" }}>
                   Quantity:
                 </Typography>
@@ -393,14 +341,17 @@ const PDP = () => {
                     color: "#333",
                     borderColor: "#ccc",
                     "&:hover": {
-                      borderColor: "#ff9800",
-                      color: "#ff9800"
-                    }
+                      borderColor: "#5e35b1",
+                      color: "#5e35b1",
+                    },
                   }}
                 >
                   -
                 </Button>
-                <Typography variant="body1" sx={{ mx: 2, fontWeight: 600, fontSize: "1.1rem", color: "#333" }}>
+                <Typography
+                  variant="body1"
+                  sx={{ mx: 2, fontWeight: 600, fontSize: "1.1rem", color: "#333" }}
+                >
                   {quantity}
                 </Typography>
                 <Button
@@ -415,34 +366,34 @@ const PDP = () => {
                     color: "#333",
                     borderColor: "#ccc",
                     "&:hover": {
-                      borderColor: "#ff9800",
-                      color: "#ff9800"
-                    }
+                      borderColor: "#5e35b1",
+                      color: "#5e35b1",
+                    },
                   }}
                 >
                   +
                 </Button>
               </Box>
             </Box>
+
             <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
               <Button
                 variant="contained"
                 size="large"
                 startIcon={<ShoppingCart />}
                 onClick={handleAddToCart}
-                disabled={addressLoading}
                 sx={{
                   flex: 1,
                   py: 1.5,
                   fontWeight: 600,
-                  background: "linear-gradient(90deg, #43cea2 0%, #185a9d 100%)",
+                  background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
                   borderRadius: "14px",
                   fontSize: "1.1rem",
-                  boxShadow: "0 4px 20px 0 rgba(67,206,162,0.10)",
+                  boxShadow: "0 4px 20px 0 rgba(101,81,255,0.10)",
                   textTransform: "none",
                   "&:hover": {
-                    background: "linear-gradient(90deg, #185a9d 0%, #43cea2 100%)"
-                  }
+                    background: "linear-gradient(90deg, #5e35b1 0%, #4527a0 100%)",
+                  },
                 }}
               >
                 Add to Cart
@@ -453,7 +404,6 @@ const PDP = () => {
                 size="large"
                 startIcon={<FlashOn />}
                 onClick={handleBuyNow}
-                disabled={addressLoading}
                 sx={{
                   flex: 1,
                   py: 1.5,
@@ -464,36 +414,88 @@ const PDP = () => {
                   textTransform: "none",
                   boxShadow: "0 4px 20px 0 rgba(255,152,0,0.10)",
                   "&:hover": {
-                    background: "linear-gradient(90deg, #ff5e62 0%, #ff9966 100%)"
-                  }
+                    background: "linear-gradient(90deg, #ff5e62 0%, #ff9966 100%)",
+                  },
                 }}
               >
-                {addressLoading ? (
-                  <CircularProgress size={24} color="inherit" />
-                ) : (
-                  "Buy Now"
-                )}
+                Buy Now
               </Button>
             </Stack>
           </Grid>
         </Grid>
 
-        {/* Snackbar Notification */}
+        {/* Cart Confirmation Dialog */}
+        <Dialog
+          open={cartDialogOpen}
+          onClose={() => setCartDialogOpen(false)}
+          aria-labelledby="cart-dialog-title"
+          aria-describedby="cart-dialog-description"
+          sx={{
+            "& .MuiDialog-paper": {
+              width: "100%",
+              maxWidth: "400px",
+              borderRadius: "16px",
+              padding: "24px",
+              position: "fixed",
+              bottom: "20px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              margin: 0,
+            },
+          }}
+        >
+          <DialogTitle
+            id="cart-dialog-title"
+            sx={{ p: 0, mb: 2, textAlign: "center" }}
+          >
+            <Stack alignItems="center" mb={1}>
+              <Avatar sx={{ bgcolor: "#5e35b1", width: 48, height: 48 }}>
+                <CheckCircle fontSize="large" sx={{ color: "#fff" }} />
+              </Avatar>
+            </Stack>
+            <Typography variant="h6" sx={{ fontWeight: "bold", color: "#4527a0" }}>
+              Item Added to Cart
+            </Typography>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0, mb: 2 }}>
+            <DialogContentText id="cart-dialog-description" sx={{ textAlign: "center" }}>
+              <b>{lastAddedProduct?.mobileName}</b> has been added to your cart.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ p: 0, justifyContent: "space-between" }}>
+            <Button
+              onClick={() => setCartDialogOpen(false)}
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+            >
+              Continue Shopping
+            </Button>
+            <Button
+              onClick={() => {
+                setCartDialogOpen(false);
+                navigate("/cartpage");
+              }}
+              variant="contained"
+              sx={{ textTransform: "none" }}
+            >
+              Go to Cart
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         <Snackbar
           open={snackbarOpen}
-          autoHideDuration={3000}
-          onClose={handleCloseSnackbar}
+          autoHideDuration={4000}
+          onClose={(_, reason) => {
+            if (reason !== "clickaway") setSnackbarOpen(false);
+          }}
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           TransitionComponent={Slide}
         >
           <Alert
-            onClose={handleCloseSnackbar}
+            onClose={() => setSnackbarOpen(false)}
             severity={snackbarSeverity}
-            sx={{
-              width: '100%',
-              borderRadius: "10px",
-              boxShadow: "0 2px 8px rgba(255,152,0,0.10)"
-            }}
+            sx={{ width: "100%" }}
           >
             {snackbarMessage}
           </Alert>

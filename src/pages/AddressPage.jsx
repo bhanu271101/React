@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -13,7 +13,12 @@ import {
   Alert,
   Snackbar,
   Slide,
-  Paper
+  Paper,
+  Card,
+  CardContent,
+  CardMedia,
+  Stack,
+  Divider
 } from "@mui/material";
 
 const AddressPage = () => {
@@ -24,6 +29,8 @@ const AddressPage = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [products, setProducts] = useState([]);
+  const [fromCart, setFromCart] = useState(false);
 
   const User = import.meta.env.VITE_USER;
   const token = localStorage.getItem("token");
@@ -37,8 +44,21 @@ const AddressPage = () => {
     pincode: "",
     phoneNumber: "",
     userName: "",
-    isDefault: false,
+    isDefault: true, // Default to true since this is often required for checkout
   });
+
+  // Initialize state from location
+  useEffect(() => {
+    if (location.state) {
+      // Handle both single product (from PDP) and multiple products (from Cart)
+      if (location.state.product) {
+        setProducts([location.state.product]);
+      } else if (location.state.products) {
+        setProducts(location.state.products);
+        setFromCart(true);
+      }
+    }
+  }, [location.state]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -53,6 +73,13 @@ const AddressPage = () => {
     setLoading(true);
     setError("");
 
+    // Basic validation
+    if (!formData.userName || !formData.phoneNumber || !formData.pincode) {
+      setError("Please fill all required fields");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await axios.post(
         `${User}/addNewAddress`,
@@ -63,13 +90,28 @@ const AddressPage = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-     navigate("/changeaddress", {
-  state: {
-    ...location.state,
-    newAddress: response.data,
-    message: "Address added successfully!",
-  },
-});
+      // Determine where to navigate next
+      const redirectTo = location.state?.redirectTo || "/payment";
+      const requireAddress = location.state?.requireAddress || false;
+
+      // Prepare navigation state
+      const navState = {
+        address: response.data,
+        requireAddress,
+        message: "Address added successfully!",
+      };
+
+      // Include product data if it exists
+      if (products.length > 0) {
+        if (fromCart) {
+          navState.products = products;
+          navState.fromCart = true;
+        } else {
+          navState.product = products[0];
+        }
+      }
+
+      navigate(redirectTo, { state: navState });
 
     } catch (err) {
       setError(err.response?.data?.message || "Failed to save address");
@@ -97,7 +139,7 @@ const AddressPage = () => {
         p: 3,
       }}
     >
-      <Container maxWidth="sm">
+      <Container maxWidth="md">
         <Paper
           elevation={6}
           sx={{
@@ -108,7 +150,71 @@ const AddressPage = () => {
           }}
         >
           <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: "bold", mb: 3, color: "#4527a0" }}>
-            Add New Address
+            {products.length > 0 ? "Confirm Your Order" : "Add New Address"}
+          </Typography>
+
+          {/* Display product summary if coming from PDP or Cart */}
+          {products.length > 0 && (
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                Order Summary
+              </Typography>
+              {fromCart ? (
+                <Stack spacing={2}>
+                  {products.map((product, index) => (
+                    <Card key={index} sx={{ display: 'flex', mb: 2 }}>
+                      <CardMedia
+                        component="img"
+                        sx={{ width: 100, objectFit: 'contain', p: 1 }}
+                        image={product.image || "https://via.placeholder.com/100"}
+                        alt={product.mobileName}
+                      />
+                      <CardContent sx={{ flex: 1 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {product.mobileName}
+                        </Typography>
+                        <Typography variant="body2">
+                          ₹{product.price.toLocaleString()} × {product.quantity}
+                        </Typography>
+                        <Typography variant="body1" fontWeight="bold">
+                          ₹{(product.price * product.quantity).toLocaleString()}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              ) : (
+                <Card sx={{ display: 'flex', mb: 2 }}>
+                  <CardMedia
+                    component="img"
+                    sx={{ width: 150, objectFit: 'contain', p: 2 }}
+                    image={products[0].image || "https://via.placeholder.com/150"}
+                    alt={products[0].mobileName}
+                  />
+                  <CardContent sx={{ flex: 1 }}>
+                    <Typography variant="h6" fontWeight="bold">
+                      {products[0].mobileName}
+                    </Typography>
+                    <Typography variant="body1">
+                      ₹{products[0].price.toLocaleString()}
+                      {products[0].discount > 0 && (
+                        <span style={{ color: 'green', marginLeft: '8px' }}>
+                          ({products[0].discount}% OFF)
+                        </span>
+                      )}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Quantity: {products[0].quantity}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
+              <Divider sx={{ my: 2 }} />
+            </Box>
+          )}
+
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mt: 2 }}>
+            Shipping Address
           </Typography>
 
           {error && (
@@ -223,7 +329,7 @@ const AddressPage = () => {
                 },
               }}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : "Save Address"}
+              {loading ? <CircularProgress size={24} color="inherit" /> : "Save Address & Continue"}
             </Button>
           </form>
         </Paper>

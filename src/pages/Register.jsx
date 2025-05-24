@@ -152,7 +152,7 @@ export default function Register() {
             <input
               type="tel"
               name="phoneNumber"
-              placeholder="Phone Number (with country code)"
+              placeholder="Phone Number"
               value={formData.phoneNumber}
               onChange={handleChange}
               required

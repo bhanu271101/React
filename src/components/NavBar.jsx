@@ -33,7 +33,6 @@ const Navbar = () => {
       }
 
       const url = `${Orders}/getCount`;
-      console.log("Fetching cart count from:", url);
 
       try {
         const response = await axios.get(url, {

@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
   Container, Typography, Button, Radio, RadioGroup,
   FormControlLabel, Paper, Box, Divider, CircularProgress,
-  Alert, Snackbar
+  Alert, Snackbar, Card, CardContent, CardMedia, Stack
 } from '@mui/material';
 import { Add, ArrowBack, CheckCircle } from '@mui/icons-material';
 
@@ -20,70 +20,75 @@ const ChangeAddressPage = () => {
     message: '',
     severity: 'success'
   });
+  const [products, setProducts] = useState([]);
+  const [fromCart, setFromCart] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isBuyNowFlow, setIsBuyNowFlow] = useState(false);
 
   const User = import.meta.env.VITE_USER;
   const token = localStorage.getItem('token');
 
-  // Handle address selection change
+  // Initialize product data from location state
+  useEffect(() => {
+    if (location.state) {
+      if (location.state.product) {
+        setProducts([location.state.product]);
+        setIsBuyNowFlow(true); // This is the Buy Now flow
+      } else if (location.state.products) {
+        setProducts(location.state.products);
+        setFromCart(true); // This is the Cart flow
+      }
+    }
+  }, [location.state]);
+
   const handleAddressChange = (event) => {
     setSelectedAddress(event.target.value);
   };
 
-  // Close snackbar
   const handleCloseSnackbar = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   useEffect(() => {
-  const fetchAddresses = async () => {
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-    try {
-      const response = await axios.get(`${User}/getAllAddresses`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setAddresses(response.data);
-
-      // Select the new address if just added, else default
-      if (location.state?.newAddress) {
-        setSelectedAddress(location.state.newAddress.addressId);
-      } else {
-        const defaultAddress = response.data.find(addr => addr.isDefault);
+    const fetchAddresses = async () => {
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+      try {
+        const response = await axios.get(`${User}/getAllAddresses`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const allAddresses = location.state?.newAddress
+          ? [...response.data, location.state.newAddress]
+          : response.data;
+          
+        setAddresses(allAddresses);
+        
+        const defaultAddress = allAddresses.find(addr =>
+          location.state?.newAddress
+            ? addr.addressId === location.state.newAddress.addressId
+            : addr.isDefault
+        );
+        
         if (defaultAddress) {
           setSelectedAddress(defaultAddress.addressId);
         }
+      } catch (err) {
+        setError('Failed to load addresses. Please try again.');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError('Failed to load addresses. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchAddresses();
-}, [User, navigate, token, location.state]);
+    };
+    fetchAddresses();
+  }, [User, navigate, token, location.state]);
 
-
-
-  const handleSetDefaultAddress = async () => {
-    if (!selectedAddress) {
-      setSnackbar({
-        open: true,
-        message: 'Please select an address first',
-        severity: 'warning'
-      });
-      return;
-    }
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+  const setDefaultAddress = async (addressId) => {
     try {
-      const addressId = Number(selectedAddress);
       const params = new URLSearchParams();
       params.append('addressId', addressId);
+      
       await axios.post(
         `${User}/setDefaultAddress`,
         params,
@@ -94,33 +99,72 @@ const ChangeAddressPage = () => {
           }
         }
       );
-      // Navigate back to payment with original state + selected address
-      navigate('/payment', {
-        state: {
-          ...location.state?.originalState,
-          address: addresses.find(addr => addr.addressId === selectedAddress)
-        }
+      return true;
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const handleProceedToPayment = async () => {
+    if (!selectedAddress) {
+      setSnackbar({
+        open: true,
+        message: 'Please select an address first',
+        severity: 'warning'
       });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // First set the selected address as default
+      await setDefaultAddress(selectedAddress);
+      
+      // Then proceed to payment with the correct data structure
+      const selectedAddr = addresses.find(addr => addr.addressId === selectedAddress);
+      
+      if (isBuyNowFlow) {
+        // Buy Now Flow - pass single product
+        navigate('/payment', { 
+          state: { 
+            product: products[0], // Single product
+            address: selectedAddr,
+            isBuyNowFlow: true // Flag to indicate Buy Now flow
+          } 
+        });
+      } else {
+        // Cart Flow - pass array of products
+        navigate('/payment', { 
+          state: { 
+            products: products, // Array of products
+            address: selectedAddr,
+            fromCart: true // Flag to indicate Cart flow
+          } 
+        });
+      }
     } catch (err) {
       setSnackbar({
         open: true,
-        message: err.response?.data?.message || 'Failed to set default address',
+        message: err.response?.data?.message || 'Failed to proceed to payment',
         severity: 'error'
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleAddNewAddress = () => {
     navigate('/addaddress', {
       state: {
-        from: '/changeaddress',
-        originalState: location.state?.originalState
+        ...location.state,
+        redirectTo: '/changeaddress',
+        requireAddress: true
       }
     });
   };
 
   const handleBack = () => {
-    navigate(-1); // Go back to previous page
+    navigate(-1);
   };
 
   if (loading) {
@@ -186,12 +230,71 @@ const ChangeAddressPage = () => {
           </Button>
         </Box>
 
+        {/* Order Summary Section */}
+        {products.length > 0 && (
+          <Paper elevation={3} sx={{ p: 3, mb: 3, borderRadius: 3, background: "rgba(255,255,255,0.9)" }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              Order Summary
+            </Typography>
+            {fromCart ? (
+              <Stack spacing={2}>
+                {products.map((product, index) => (
+                  <Card key={index} sx={{ display: 'flex' }}>
+                    <CardMedia
+                      component="img"
+                      sx={{ width: 100, objectFit: 'contain', p: 1 }}
+                      image={product.image || "https://via.placeholder.com/100"}
+                      alt={product.mobileName}
+                    />
+                    <CardContent sx={{ flex: 1 }}>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {product.mobileName}
+                      </Typography>
+                      <Typography variant="body2">
+                        ₹{product.price.toLocaleString()} × {product.quantity}
+                      </Typography>
+                      <Typography variant="body1" fontWeight="bold">
+                        ₹{(product.price * product.quantity).toLocaleString()}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            ) : (
+              <Card sx={{ display: 'flex' }}>
+                <CardMedia
+                  component="img"
+                  sx={{ width: 150, objectFit: 'contain', p: 2 }}
+                  image={products[0].image || "https://via.placeholder.com/150"}
+                  alt={products[0].mobileName}
+                />
+                <CardContent>
+                  <Typography variant="h6" fontWeight="bold">
+                    {products[0].mobileName}
+                  </Typography>
+                  <Typography variant="body1">
+                    ₹{products[0].price.toLocaleString()}
+                    {products[0].discount > 0 && (
+                      <span style={{ color: 'green', marginLeft: '8px' }}>
+                        ({products[0].discount}% OFF)
+                      </span>
+                    )}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Quantity: {products[0].quantity}
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+          </Paper>
+        )}
+
         <Typography variant="h4" gutterBottom sx={{
           fontWeight: 'bold',
           mb: 3,
           color: '#4527a0'
         }}>
-          Your Addresses
+          Select Shipping Address
         </Typography>
 
         {addresses.length === 0 ? (
@@ -322,8 +425,8 @@ const ChangeAddressPage = () => {
               </Button>
               <Button
                 variant="contained"
-                onClick={handleSetDefaultAddress}
-                disabled={!selectedAddress || addresses.find(addr => addr.addressId === selectedAddress)?.isDefault}
+                onClick={handleProceedToPayment}
+                disabled={!selectedAddress || isProcessing}
                 sx={{
                   fontWeight: 600,
                   borderRadius: 2,
@@ -338,7 +441,14 @@ const ChangeAddressPage = () => {
                   }
                 }}
               >
-                Set as Default
+                {isProcessing ? (
+                  <>
+                    <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
+                    Processing...
+                  </>
+                ) : (
+                  'Proceed to Payment'
+                )}
               </Button>
             </Box>
           </>

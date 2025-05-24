@@ -157,61 +157,77 @@ const CartPage = () => {
     );
   };
 
-  const handleBuyFromCart = async () => {
-    if (selectedItems.length === 0) {
-      setSnackbar({
-        open: true,
-        message: "Please select at least one item to purchase",
-        severity: "warning"
-      });
-      return;
-    }
+ const handleBuyFromCart = async () => {
+  if (selectedItems.length === 0) {
+    setSnackbar({
+      open: true,
+      message: "Please select at least one item to purchase",
+      severity: "warning"
+    });
+    return;
+  }
 
-    const token = getToken();
-    if (!token) return;
+  const token = getToken();
+  if (!token) return;
 
-    try {
-      const address = await checkDefaultAddress();
-      if (!address) {
-        navigate("/addaddress", {
-          state: {
-            from: "/cart",
-            message: "Please add a default address to complete your purchase"
-          }
-        });
-        return;
-      }
+  try {
+    // Prepare the product data in the same format as PDP page
+    const selectedProducts = cartItems
+      .filter(item => selectedItems.includes(item.id.toString()))
+      .map(item => ({
+        mobileId: item.mobileId,
+        mobileName: productDetails[item.mobileId]?.mobileName || "Product",
+        price: item.amount,
+        discount: 0, // Add discount if available
+        description: productDetails[item.mobileId]?.description || "",
+        image: productDetails[item.mobileId]?.image || null,
+        quantity: item.quantity,
+        actionType: "buy",
+        cartItemId: item.id // Keep cart item ID for reference
+      }));
 
-      const selectedCartItems = cartItems
-        .filter(item => selectedItems.includes(item.id.toString()))
-        .map(item => ({
-          ...item,
-          mobileName: productDetails[item.mobileId]?.mobileName || "Product",
-          price: item.amount,
-          image: productDetails[item.mobileId]?.image || null,
-          id: item.id
-        }));
-
-      navigate("/payment", {
-        state: {
-          products: selectedCartItems,
+    // Check for address (same logic as PDP)
+    const address = await checkDefaultAddress();
+    
+    if (address) {
+      // Address exists - go to payment with all selected items
+      navigate("/payment", { 
+        state: { 
+          products: selectedProducts,
           address: address,
           fromCart: true
         }
       });
-
-    } catch (error) {
-      console.error("Error buying from cart:", error);
-
-      if (error.response?.status === 401) {
-        localStorage.removeItem("token");
-        navigate("/login", { state: { message: "Session expired. Please log in again." } });
-        return;
-      }
-    } finally {
-      setLoading(false);
+    } else {
+      // No address - go to add address with product details
+      navigate("/addaddress", { 
+        state: { 
+          products: selectedProducts,
+          redirectTo: "/payment",
+          requireAddress: true,
+          fromCart: true
+        }
+      });
     }
-  };
+  } catch (error) {
+    console.error("Error in buy process:", error);
+    setSnackbar({
+      open: true,
+      message: error.response?.data?.message || "Failed to proceed with purchase",
+      severity: "error"
+    });
+
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      navigate("/login", { 
+        state: { 
+          message: "Session expired. Please log in again.",
+          redirectTo: "/cart"
+        } 
+      });
+    }
+  }
+};
 
   const handleContinueShopping = () => {
     navigate("/gallery");

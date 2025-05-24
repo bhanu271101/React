@@ -333,6 +333,8 @@ const OrderDetailsPage = () => {
   const isDelivered = orderStatus === "Delivered";
   const isCancelled = orderStatus === "Cancelled";
   const isReturned = orderStatus === "Returned";
+  const showCancelButton = !isCancelled && !isDelivered && !isReturned;
+  const showTrackButton = trackingId && (isDelivered || (!isCancelled && !isReturned));
 
   return (
     <Container maxWidth="md" sx={{ py: 2 }}>
@@ -447,8 +449,8 @@ const OrderDetailsPage = () => {
                   : "Expected delivery date not available"}
               </Typography>
 
-              {/* Show Track Package button only if order is active and trackingId exists */}
-              {!isDelivered && !isCancelled && !isReturned && trackingId && (
+              {/* Show Track Package button if trackingId exists and order is not cancelled or returned */}
+              {showTrackButton && (
                 <Button
                   variant="outlined"
                   startIcon={<LocalShipping />}
@@ -468,18 +470,21 @@ const OrderDetailsPage = () => {
               )}
             </Box>
 
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<Delete />}
-              onClick={() => setDeleteConfirmOpen(true)}
-              sx={{
-                mt: 3,
-                textTransform: "none",
-              }}
-            >
-              Cancel Order
-            </Button>
+            {/* Show Cancel Order button only if order is not already cancelled, delivered, or returned */}
+            {showCancelButton && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<Delete />}
+                onClick={() => setDeleteConfirmOpen(true)}
+                sx={{
+                  mt: 3,
+                  textTransform: "none",
+                }}
+              >
+                Cancel Order
+              </Button>
+            )}
           </Grid>
         </Grid>
       </Card>

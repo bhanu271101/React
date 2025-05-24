@@ -89,7 +89,6 @@ const OrdersPage = () => {
           
         });
 
-         console.log("ordersResponse.data:", ordersResponse.data);
         const sortedOrders = ordersResponse.data.sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
