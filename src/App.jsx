@@ -18,6 +18,7 @@ import OrderManagementDashboard from "./components/OrderManagementDashboard";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import PaymentPage from "./pages/PaymentPage";
 import ChangeAddressPage from "./pages/ChangeAddressPage";
+import ForgotPassword from "./pages/ForgotPassword";
 // Create a theme instance
 const theme = createTheme({
   palette: {
@@ -70,6 +71,7 @@ function App() {
           <Route path="/hubpage" element={<OrderManagementDashboard/>}/>
           <Route path="/payment" element={<PaymentPage/>}/>
           <Route path="/changeaddress" element={<ChangeAddressPage/>}/>
+          <Route path="/forgotpassword" element={<ForgotPassword/>}/>
         </Routes>
       </Router>
     </ThemeProvider>

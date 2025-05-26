@@ -38,7 +38,25 @@ function Login() {
       navigate("/gallery");
     } catch (err) {
       console.error("Login error:", err);
-      setError("Invalid credentials. Please try again.");
+
+      if (err.response) {
+        // Backend returned a response (error status)
+        if (typeof err.response.data === "string") {
+          // Plain string error message
+          setError(err.response.data);
+        } else if (err.response.data && err.response.data.message) {
+          // JSON object with message field
+          setError(err.response.data.message);
+        } else {
+          setError("Login failed. Please check your credentials.");
+        }
+      } else if (err.request) {
+        // No response from server
+        setError("No response from server. Please try again.");
+      } else {
+        // Other errors
+        setError("Login error. Please try again.");
+      }
     }
   };
 

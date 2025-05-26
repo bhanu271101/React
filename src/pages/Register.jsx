@@ -11,6 +11,7 @@ export default function Register() {
     phoneNumber: ""
   });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(""); // For showing success messages
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const User = import.meta.env.VITE_USER;
@@ -22,13 +23,14 @@ export default function Register() {
       [name]: value
     }));
     if (error) setError("");
+    if (success) setSuccess("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Validation
+
+    // Client-side validation
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.phoneNumber) {
       setError("All fields are required");
       setLoading(false);
@@ -65,24 +67,44 @@ export default function Register() {
       );
 
       if (response.status === 200 || response.status === 201) {
-        navigate("/login");
+        setSuccess("Registration successful! Please check your email to verify your account.");
+        setError("");
+        setTimeout(() => {
+          navigate("/login");
+        }, 2000);
       }
     } catch (err) {
-      console.error("Registration error:", err);
-      if (err.response) {
-        if (err.response.data) {
-          setError(err.response.data.message || 
-                   err.response.data.error || 
-                   "Registration failed. Please check your details.");
-        } else {
-          setError(`Registration failed with status: ${err.response.status}`);
-        }
-      } else if (err.request) {
-        setError("No response from server. Please try again.");
-      } else {
-        setError("Registration error. Please try again.");
-      }
-    } finally {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    // If backend sends a string
+    if (typeof data === "string") {
+      setError(data);
+    }
+    // If backend sends a JSON object with a 'detail' field (RFC 7807 Problem Details)
+    else if (data.detail) {
+      setError(data.detail);
+    }
+    // If backend sends a JSON object with a 'message' field
+    else if (data.message) {
+      setError(data.message);
+    }
+    // If backend sends a JSON object with an 'error' field
+    else if (data.error) {
+      setError(data.error);
+    }
+    // Fallback: show the whole object (for debugging)
+    else {
+      setError(JSON.stringify(data));
+    }
+  } else if (err.request) {
+    setError("No response from server. Please try again.");
+  } else {
+    setError("Registration error. Please try again.");
+  }
+}
+
+
+finally {
       setLoading(false);
     }
   };
@@ -95,6 +117,27 @@ export default function Register() {
             <h1 id="register-header">Create an Account</h1>
             <p>It's quick and easy.</p>
           </header>
+
+          {success && (
+            <div
+              className="success-message"
+              role="status"
+              aria-live="polite"
+              style={{
+                color: "#388e3c",
+                backgroundColor: "#e8f5e9",
+                borderRadius: "6px",
+                padding: "10px 15px",
+                textAlign: "center",
+                marginBottom: "15px",
+                fontSize: "14px",
+                fontWeight: 600,
+                boxShadow: "0 1px 3px rgba(56, 142, 60, 0.2)"
+              }}
+            >
+              {success}
+            </div>
+          )}
 
           {error && (
             <div className="error-message" role="alert" aria-live="assertive">
@@ -169,8 +212,6 @@ export default function Register() {
           </form>
         </section>
       </main>
-
-      {/* CSS remains exactly the same */}
       <style>{`
         .register-container {
           min-height: 100vh;
@@ -218,6 +259,18 @@ export default function Register() {
           font-size: 14px;
           font-weight: 600;
           box-shadow: 0 1px 3px rgba(211, 47, 47, 0.3);
+        }
+
+        .success-message {
+          color: #388e3c;
+          background-color: #e8f5e9;
+          border-radius: 6px;
+          padding: 10px 15px;
+          text-align: center;
+          margin-bottom: 15px;
+          font-size: 14px;
+          font-weight: 600;
+          box-shadow: 0 1px 3px rgba(56, 142, 60, 0.2);
         }
 
         form {
