@@ -1,21 +1,26 @@
-# Base image
-FROM node:20
+# Stage 1: Build
+FROM node:20 AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm ci
 
-# Copy the rest of the app
 COPY . .
+RUN npm run build
 
-# Fix: make vite binary executable if installed locally (optional safety)
-RUN chmod +x node_modules/.bin/vite
+# Stage 2: Production
+FROM node:20-slim
 
-# Expose port (Vite uses 5173 by default)
+WORKDIR /app
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+
+# If you need the vite binary for preview:
+# RUN chmod +x node_modules/.bin/vite
+
 EXPOSE 5173
 
-# Start the Vite development server
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "preview"]
