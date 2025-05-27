@@ -11,7 +11,7 @@ export default function Register() {
     phoneNumber: ""
   });
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(""); // For showing success messages
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const User = import.meta.env.VITE_USER;
@@ -23,7 +23,7 @@ export default function Register() {
       [name]: value
     }));
     if (error) setError("");
-    if (success) setSuccess("");
+    if (success) setSuccess(false);
   };
 
   const handleSubmit = async (e) => {
@@ -67,44 +67,36 @@ export default function Register() {
       );
 
       if (response.status === 200 || response.status === 201) {
-        setSuccess("Registration successful! Please check your email to verify your account.");
+        setSuccess(true);
         setError("");
         setTimeout(() => {
           navigate("/login");
-        }, 2000);
+        }, 10000);
       }
     } catch (err) {
-  if (err.response && err.response.data) {
-    const data = err.response.data;
-    // If backend sends a string
-    if (typeof data === "string") {
-      setError(data);
-    }
-    // If backend sends a JSON object with a 'detail' field (RFC 7807 Problem Details)
-    else if (data.detail) {
-      setError(data.detail);
-    }
-    // If backend sends a JSON object with a 'message' field
-    else if (data.message) {
-      setError(data.message);
-    }
-    // If backend sends a JSON object with an 'error' field
-    else if (data.error) {
-      setError(data.error);
-    }
-    // Fallback: show the whole object (for debugging)
-    else {
-      setError(JSON.stringify(data));
-    }
-  } else if (err.request) {
-    setError("No response from server. Please try again.");
-  } else {
-    setError("Registration error. Please try again.");
-  }
-}
-
-
-finally {
+      if (err.response && err.response.data) {
+        const data = err.response.data;
+        if (typeof data === "string") {
+          setError(data);
+        }
+        else if (data.detail) {
+          setError(data.detail);
+        }
+        else if (data.message) {
+          setError(data.message);
+        }
+        else if (data.error) {
+          setError(data.error);
+        }
+        else {
+          setError(JSON.stringify(data));
+        }
+      } else if (err.request) {
+        setError("No response from server. Please try again.");
+      } else {
+        setError("Registration error. Please try again.");
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -118,98 +110,106 @@ finally {
             <p>It's quick and easy.</p>
           </header>
 
-          {success && (
-            <div
-              className="success-message"
-              role="status"
-              aria-live="polite"
-              style={{
-                color: "#388e3c",
-                backgroundColor: "#e8f5e9",
-                borderRadius: "6px",
-                padding: "10px 15px",
-                textAlign: "center",
-                marginBottom: "15px",
-                fontSize: "14px",
-                fontWeight: 600,
-                boxShadow: "0 1px 3px rgba(56, 142, 60, 0.2)"
-              }}
-            >
-              {success}
-            </div>
-          )}
-
           {error && (
             <div className="error-message" role="alert" aria-live="assertive">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate>
-            <input
-              type="text"
-              name="name"
-              placeholder="Full Name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              aria-required="true"
-              autoComplete="name"
-              disabled={loading}
-            />
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              aria-required="true"
-              autoComplete="email"
-              disabled={loading}
-            />
-            <input
-              type="password"
-              name="password"
-              placeholder="Password (min 8 characters)"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              aria-required="true"
-              minLength={8}
-              autoComplete="new-password"
-              disabled={loading}
-            />
-            <input
-              type="password"
-              name="confirmPassword"
-              placeholder="Confirm Password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              aria-required="true"
-              minLength={8}
-              autoComplete="new-password"
-              disabled={loading}
-            />
-            <input
-              type="tel"
-              name="phoneNumber"
-              placeholder="Phone Number"
-              value={formData.phoneNumber}
-              onChange={handleChange}
-              required
-              aria-required="true"
-              autoComplete="tel"
-              disabled={loading}
-            />
-            <button type="submit" disabled={loading} aria-busy={loading}>
-              {loading ? "Registering..." : "Register"}
-            </button>
-            <span>
-              Already have an account? <a href="/login">Login</a>
-            </span>
-          </form>
+          {success ? (
+            <div className="verification-message" role="status" aria-live="polite">
+              <div className="verification-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#388e3c">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+              <h3>Registration Successful!</h3>
+              <p>We've sent a verification link to your email address.</p>
+              <p className="verification-note">
+                Please check your inbox and verify your email before logging in.
+                <br />
+                Didn't receive the email? Check your spam folder.
+              </p>
+              <p className="redirect-notice">
+                You'll be redirected to login page in 10 seconds...
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} noValidate>
+              <input
+                type="text"
+                name="name"
+                placeholder="Full Name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                aria-required="true"
+                autoComplete="name"
+                disabled={loading}
+              />
+              <input
+                type="email"
+                name="email"
+                placeholder="Email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                aria-required="true"
+                autoComplete="email"
+                disabled={loading}
+              />
+              <input
+                type="password"
+                name="password"
+                placeholder="Password (min 8 characters)"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                aria-required="true"
+                minLength={8}
+                autoComplete="new-password"
+                disabled={loading}
+              />
+              <input
+                type="password"
+                name="confirmPassword"
+                placeholder="Confirm Password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+                aria-required="true"
+                minLength={8}
+                autoComplete="new-password"
+                disabled={loading}
+              />
+              <input
+                type="tel"
+                name="phoneNumber"
+                placeholder="Phone Number"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+                required
+                aria-required="true"
+                autoComplete="tel"
+                disabled={loading}
+              />
+              <button type="submit" disabled={loading} aria-busy={loading}>
+                {loading ? (
+                  <>
+                    <svg className="spinner" viewBox="0 0 50 50">
+                      <circle cx="25" cy="25" r="20" fill="none" strokeWidth="5"></circle>
+                    </svg>
+                    Registering...
+                  </>
+                ) : (
+                  "Register"
+                )}
+              </button>
+              <span>
+                Already have an account? <a href="/login">Login</a>
+              </span>
+            </form>
+          )}
         </section>
       </main>
       <style>{`
@@ -224,6 +224,7 @@ finally {
 
         .login {
           max-width: 320px;
+          width: 100%;
           background-color: #ffffff;
           border-radius: 8px;
           padding: 2.5rem 2rem;
@@ -261,16 +262,54 @@ finally {
           box-shadow: 0 1px 3px rgba(211, 47, 47, 0.3);
         }
 
-        .success-message {
-          color: #388e3c;
-          background-color: #e8f5e9;
-          border-radius: 6px;
-          padding: 10px 15px;
+        .verification-message {
           text-align: center;
-          margin-bottom: 15px;
+          padding: 20px 0;
+        }
+
+        .verification-icon {
+          width: 60px;
+          height: 60px;
+          margin: 0 auto 15px;
+          background-color: #e8f5e9;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .verification-icon svg {
+          width: 30px;
+          height: 30px;
+        }
+
+        .verification-message h3 {
+          color: #388e3c;
+          font-size: 20px;
+          margin-bottom: 10px;
+        }
+
+        .verification-message p {
+          color: #616161;
+          font-size: 15px;
+          line-height: 1.5;
+          margin-bottom: 8px;
+        }
+
+        .verification-note {
           font-size: 14px;
-          font-weight: 600;
-          box-shadow: 0 1px 3px rgba(56, 142, 60, 0.2);
+          color: #757575;
+          margin-top: 15px;
+          padding: 10px;
+          background-color: #f5f5f5;
+          border-radius: 6px;
+        }
+
+        .redirect-notice {
+          font-size: 13px;
+          color: #9e9e9e;
+          margin-top: 20px;
+          font-style: italic;
         }
 
         form {
@@ -319,6 +358,39 @@ finally {
         form button:disabled {
           background-color: #cccccc;
           cursor: not-allowed;
+        }
+
+        .spinner {
+          animation: rotate 1s linear infinite;
+          width: 20px;
+          height: 20px;
+        }
+        
+        .spinner circle {
+          stroke: #ffffff;
+          stroke-linecap: round;
+          animation: dash 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes rotate {
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+        
+        @keyframes dash {
+          0% {
+            stroke-dasharray: 1, 150;
+            stroke-dashoffset: 0;
+          }
+          50% {
+            stroke-dasharray: 90, 150;
+            stroke-dashoffset: -35;
+          }
+          100% {
+            stroke-dasharray: 90, 150;
+            stroke-dashoffset: -124;
+          }
         }
 
         form span {

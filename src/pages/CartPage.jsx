@@ -57,7 +57,6 @@ const CartPage = () => {
       if (error.response?.status === 404) {
         return null;
       }
-      console.error("Error checking default address:", error);
       return null;
     } finally {
       setCheckingAddress(false);
@@ -70,18 +69,16 @@ const CartPage = () => {
       if (!token) return;
 
       try {
-        const [cartResponse, address] = await Promise.all([
+        const [cartResponse] = await Promise.all([
           axios.get(`${Orders}/getAllCart`, {
             headers: { Authorization: `Bearer ${token}` }
-          }),
-          checkDefaultAddress()
+          })
         ]);
 
         const cartItemsData = cartResponse.data;
         setCartItems(cartItemsData);
         setSelectedItems(cartItemsData.map(item => item.id.toString()));
 
-        // Only proceed with product details if there are items in cart
         if (cartItemsData.length > 0) {
           const productDetailsMap = {};
           const mobileIds = [];
@@ -113,8 +110,6 @@ const CartPage = () => {
           setProductDetails({});
         }
       } catch (error) {
-        console.error("Error fetching cart items:", error);
-
         if (error.response?.status === 401) {
           localStorage.removeItem("token");
           navigate("/login", { state: { message: "Session expired. Please log in again." } });
@@ -157,77 +152,73 @@ const CartPage = () => {
     );
   };
 
- const handleBuyFromCart = async () => {
-  if (selectedItems.length === 0) {
-    setSnackbar({
-      open: true,
-      message: "Please select at least one item to purchase",
-      severity: "warning"
-    });
-    return;
-  }
-
-  const token = getToken();
-  if (!token) return;
-
-  try {
-    // Prepare the product data in the same format as PDP page
-    const selectedProducts = cartItems
-      .filter(item => selectedItems.includes(item.id.toString()))
-      .map(item => ({
-        mobileId: item.mobileId,
-        mobileName: productDetails[item.mobileId]?.mobileName || "Product",
-        price: item.amount,
-        discount: 0, // Add discount if available
-        description: productDetails[item.mobileId]?.description || "",
-        image: productDetails[item.mobileId]?.image || null,
-        quantity: item.quantity,
-        actionType: "buy",
-        cartItemId: item.id // Keep cart item ID for reference
-      }));
-
-    // Check for address (same logic as PDP)
-    const address = await checkDefaultAddress();
-    
-    if (address) {
-      // Address exists - go to payment with all selected items
-      navigate("/payment", { 
-        state: { 
-          products: selectedProducts,
-          address: address,
-          fromCart: true
-        }
+  const handleBuyFromCart = async () => {
+    if (selectedItems.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "Please select at least one item to purchase",
+        severity: "warning"
       });
-    } else {
-      // No address - go to add address with product details
-      navigate("/addaddress", { 
-        state: { 
-          products: selectedProducts,
-          redirectTo: "/payment",
-          requireAddress: true,
-          fromCart: true
-        }
-      });
+      return;
     }
-  } catch (error) {
-    console.error("Error in buy process:", error);
-    setSnackbar({
-      open: true,
-      message: error.response?.data?.message || "Failed to proceed with purchase",
-      severity: "error"
-    });
 
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      navigate("/login", { 
-        state: { 
-          message: "Session expired. Please log in again.",
-          redirectTo: "/cart"
-        } 
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      // Prepare the product data
+      const selectedProducts = cartItems
+        .filter(item => selectedItems.includes(item.id.toString()))
+        .map(item => ({
+          mobileId: item.mobileId,
+          mobileName: productDetails[item.mobileId]?.mobileName || "Product",
+          price: item.amount,
+          discount: 0,
+          description: productDetails[item.mobileId]?.description || "",
+          image: productDetails[item.mobileId]?.image || null, // <-- IMAGE IS INCLUDED
+          quantity: item.quantity,
+          actionType: "buy",
+          cartItemId: item.id
+        }));
+
+      const address = await checkDefaultAddress();
+
+      if (address) {
+        navigate("/payment", {
+          state: {
+            products: selectedProducts,
+            address: address,
+            fromCart: true
+          }
+        });
+      } else {
+        navigate("/addaddress", {
+          state: {
+            products: selectedProducts,
+            redirectTo: "/payment",
+            requireAddress: true,
+            fromCart: true
+          }
+        });
+      }
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || "Failed to proceed with purchase",
+        severity: "error"
       });
+
+      if (error.response?.status === 401) {
+        localStorage.removeItem("token");
+        navigate("/login", {
+          state: {
+            message: "Session expired. Please log in again.",
+            redirectTo: "/cart"
+          }
+        });
+      }
     }
-  }
-};
+  };
 
   const handleContinueShopping = () => {
     navigate("/gallery");
@@ -251,7 +242,6 @@ const CartPage = () => {
         severity: "success"
       });
     } catch (error) {
-      console.error("Error removing item:", error);
       setSnackbar({
         open: true,
         message: "Failed to remove item. Please try again.",
@@ -288,7 +278,6 @@ const CartPage = () => {
         }}>
           Your Shopping Cart
         </Typography>
-
         {cartItems.length === 0 ? (
           <Box textAlign="center" py={8}>
             <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
@@ -441,7 +430,6 @@ const CartPage = () => {
                         {product.mobileName}
                       </Typography>
                     </Box>
-
                     <CardMedia
                       component="img"
                       image={
@@ -478,79 +466,18 @@ const CartPage = () => {
                           ₹{(item.amount * item.quantity).toLocaleString()}
                         </Typography>
                       </Box>
-
-                      {item.quantity > 1 && (
-                        <Typography variant="body2" color="text.secondary">
-                          (₹{item.amount.toLocaleString()} each)
-                        </Typography>
-                      )}
-
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        size="small"
-                        fullWidth
-                        sx={{
-                          mt: 2,
-                          textTransform: 'none'
-                        }}
-                        onClick={() => handleRemoveItem(item.id)}
-                      >
-                        Remove from Cart
-                      </Button>
                     </CardContent>
+                    <Button
+                      variant="text"
+                      color="error"
+                      onClick={() => handleRemoveItem(item.id)}
+                      sx={{ fontWeight: 600 }}
+                    >
+                      Remove
+                    </Button>
                   </Card>
                 );
               })}
-            </Box>
-
-            <Divider sx={{ my: 3 }} />
-
-            <Box sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              mt: 4
-            }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={handleContinueShopping}
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  fontWeight: 600,
-                  borderRadius: 2
-                }}
-              >
-                Continue Shopping
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleBuyFromCart}
-                disabled={selectedItems.length === 0 || checkingAddress}
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  fontWeight: 600,
-                  borderRadius: 2,
-                  background: "linear-gradient(90deg, #43cea2 0%, #185a9d 100%)",
-                  '&:hover': {
-                    background: "linear-gradient(90deg, #185a9d 0%, #43cea2 100%)"
-                  },
-                  '&:disabled': {
-                    backgroundColor: '#e0e0e0'
-                  }
-                }}
-              >
-                {checkingAddress ? (
-                  <>
-                    <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
-                    Checking...
-                  </>
-                ) : "Proceed to Checkout"}
-              </Button>
             </Box>
           </>
         )}
@@ -559,12 +486,14 @@ const CartPage = () => {
           open={snackbar.open}
           autoHideDuration={3000}
           onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
           <Alert
             onClose={handleCloseSnackbar}
             severity={snackbar.severity}
-            sx={{ width: '100%', borderRadius: 2 }}
+            sx={{
+              width: '100%',
+              borderRadius: "10px"
+            }}
           >
             {snackbar.message}
           </Alert>

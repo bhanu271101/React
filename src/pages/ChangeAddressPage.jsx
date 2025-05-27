@@ -4,7 +4,8 @@ import axios from 'axios';
 import {
   Container, Typography, Button, Radio, RadioGroup,
   FormControlLabel, Paper, Box, Divider, CircularProgress,
-  Alert, Snackbar, Card, CardContent, CardMedia, Stack
+  Alert, Snackbar, Card, CardContent, Stack, Avatar, Chip,
+  Backdrop
 } from '@mui/material';
 import { Add, ArrowBack, CheckCircle } from '@mui/icons-material';
 
@@ -21,9 +22,9 @@ const ChangeAddressPage = () => {
     severity: 'success'
   });
   const [products, setProducts] = useState([]);
+  const [product, setProduct] = useState(null);
   const [fromCart, setFromCart] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isBuyNowFlow, setIsBuyNowFlow] = useState(false);
 
   const User = import.meta.env.VITE_USER;
   const token = localStorage.getItem('token');
@@ -31,15 +32,34 @@ const ChangeAddressPage = () => {
   // Initialize product data from location state
   useEffect(() => {
     if (location.state) {
-      if (location.state.product) {
-        setProducts([location.state.product]);
-        setIsBuyNowFlow(true); // This is the Buy Now flow
-      } else if (location.state.products) {
-        setProducts(location.state.products);
-        setFromCart(true); // This is the Cart flow
+      if (location.state.fromCart) {
+        setProducts(location.state.products || []);
+        setFromCart(true);
+      } else {
+        setProduct(location.state.product || null);
+        setFromCart(false);
       }
     }
   }, [location.state]);
+
+  // Robust image handling function - same as PaymentPage
+  const getProductImage = (product) => {
+    if (product.image) {
+      if (product.image.startsWith("data:image")) {
+        return product.image;
+      }
+      // If it's already a URL (starts with http), use as is
+      if (product.image.startsWith("http")) {
+        return product.image;
+      }
+      // Otherwise, treat as base64 string
+      return `data:image/jpeg;base64,${product.image}`;
+    }
+    if (product.imageUrl) {
+      return product.imageUrl;
+    }
+    return "https://via.placeholder.com/60x60?text=Mobile";
+  };
 
   const handleAddressChange = (event) => {
     setSelectedAddress(event.target.value);
@@ -59,19 +79,19 @@ const ChangeAddressPage = () => {
         const response = await axios.get(`${User}/getAllAddresses`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         const allAddresses = location.state?.newAddress
           ? [...response.data, location.state.newAddress]
           : response.data;
-          
+
         setAddresses(allAddresses);
-        
+
         const defaultAddress = allAddresses.find(addr =>
           location.state?.newAddress
             ? addr.addressId === location.state.newAddress.addressId
             : addr.isDefault
         );
-        
+
         if (defaultAddress) {
           setSelectedAddress(defaultAddress.addressId);
         }
@@ -88,7 +108,7 @@ const ChangeAddressPage = () => {
     try {
       const params = new URLSearchParams();
       params.append('addressId', addressId);
-      
+
       await axios.post(
         `${User}/setDefaultAddress`,
         params,
@@ -119,27 +139,27 @@ const ChangeAddressPage = () => {
     try {
       // First set the selected address as default
       await setDefaultAddress(selectedAddress);
-      
+
       // Then proceed to payment with the correct data structure
       const selectedAddr = addresses.find(addr => addr.addressId === selectedAddress);
-      
-      if (isBuyNowFlow) {
-        // Buy Now Flow - pass single product
-        navigate('/payment', { 
-          state: { 
-            product: products[0], // Single product
+
+      if (fromCart) {
+        // Cart Flow - pass array of products
+        navigate('/payment', {
+          state: {
+            products: products,
             address: selectedAddr,
-            isBuyNowFlow: true // Flag to indicate Buy Now flow
-          } 
+            fromCart: true
+          }
         });
       } else {
-        // Cart Flow - pass array of products
-        navigate('/payment', { 
-          state: { 
-            products: products, // Array of products
+        // Buy Now Flow - pass single product and fromCart false
+        navigate('/payment', {
+          state: {
+            product: product,
             address: selectedAddr,
-            fromCart: true // Flag to indicate Cart flow
-          } 
+            fromCart: false
+          }
         });
       }
     } catch (err) {
@@ -192,21 +212,30 @@ const ChangeAddressPage = () => {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%)",
+        background: "linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%)",
         py: 4,
       }}
     >
+      {/* Backdrop for processing */}
+      <Backdrop
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 2 }}
+        open={isProcessing}
+      >
+        <CircularProgress color="inherit" size={70} thickness={4} />
+        <Typography variant="h6" sx={{ ml: 3 }}>Processing...</Typography>
+      </Backdrop>
+
       <Container maxWidth="md">
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Button
             startIcon={<ArrowBack />}
             onClick={handleBack}
             sx={{
-              color: '#4527a0',
+              color: '#1976d2',
               fontWeight: 600,
               textTransform: 'none',
               '&:hover': {
-                backgroundColor: 'rgba(69, 39, 160, 0.06)'
+                backgroundColor: 'rgba(25, 118, 210, 0.08)'
               }
             }}
           >
@@ -230,75 +259,138 @@ const ChangeAddressPage = () => {
           </Button>
         </Box>
 
-        {/* Order Summary Section */}
-        {products.length > 0 && (
-          <Paper elevation={3} sx={{ p: 3, mb: 3, borderRadius: 3, background: "rgba(255,255,255,0.9)" }}>
+        {/* Order Summary Section - Updated to match PaymentPage style */}
+        {(fromCart && products.length > 0) ? (
+          <Paper elevation={3} sx={{ 
+            p: 3, 
+            mb: 3, 
+            borderRadius: '18px',
+            background: "rgba(255,255,255,0.85)",
+            boxShadow: "0 8px 32px 0 rgba(67,206,162,0.10)",
+          }}>
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
               Order Summary
             </Typography>
-            {fromCart ? (
-              <Stack spacing={2}>
-                {products.map((product, index) => (
-                  <Card key={index} sx={{ display: 'flex' }}>
-                    <CardMedia
-                      component="img"
-                      sx={{ width: 100, objectFit: 'contain', p: 1 }}
-                      image={product.image || "https://via.placeholder.com/100"}
-                      alt={product.mobileName}
-                    />
-                    <CardContent sx={{ flex: 1 }}>
-                      <Typography variant="subtitle1" fontWeight="bold">
-                        {product.mobileName}
-                      </Typography>
-                      <Typography variant="body2">
-                        ₹{product.price.toLocaleString()} × {product.quantity}
-                      </Typography>
-                      <Typography variant="body1" fontWeight="bold">
-                        ₹{(product.price * product.quantity).toLocaleString()}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                ))}
-              </Stack>
-            ) : (
-              <Card sx={{ display: 'flex' }}>
-                <CardMedia
-                  component="img"
-                  sx={{ width: 150, objectFit: 'contain', p: 2 }}
-                  image={products[0].image || "https://via.placeholder.com/150"}
-                  alt={products[0].mobileName}
-                />
-                <CardContent>
-                  <Typography variant="h6" fontWeight="bold">
-                    {products[0].mobileName}
-                  </Typography>
-                  <Typography variant="body1">
-                    ₹{products[0].price.toLocaleString()}
-                    {products[0].discount > 0 && (
-                      <span style={{ color: 'green', marginLeft: '8px' }}>
-                        ({products[0].discount}% OFF)
-                      </span>
+            <Box sx={{ maxHeight: '240px', overflowY: 'auto' }}>
+              {products.map((product, index) => (
+                <Card key={index} elevation={0} sx={{
+                  mb: 2,
+                  p: 1,
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '10px',
+                  background: "#f8f9fa"
+                }}>
+                  <CardContent sx={{ p: 1 }}>
+                    <Stack direction="row" alignItems="center" spacing={2}>
+                      <Avatar
+                        src={getProductImage(product)}
+                        alt={product.mobileName}
+                        variant="rounded"
+                        sx={{ width: 60, height: 60, bgcolor: "#e0e0e0" }}
+                      />
+                      <Box>
+                        <Typography variant="subtitle2" sx={{
+                          fontWeight: 600,
+                          color: '#222',
+                          mb: 0.5
+                        }}>
+                          {product.mobileName}
+                        </Typography>
+                        <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
+                          <Chip label={`Qty: ${product.quantity}`} size="small" />
+                          <Chip
+                            label={`₹${(product.price * product.quantity).toLocaleString('en-IN')}`}
+                            size="small"
+                            color="primary"
+                          />
+                        </Stack>
+                        {product.discount > 0 && (
+                          <Chip 
+                            label={`${product.discount}% OFF`} 
+                            size="small" 
+                            color="success" 
+                            sx={{ mt: 0.5 }}
+                          />
+                        )}
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+          </Paper>
+        ) : product && (
+          <Paper elevation={3} sx={{ 
+            p: 3, 
+            mb: 3, 
+            borderRadius: '18px',
+            background: "rgba(255,255,255,0.85)",
+            boxShadow: "0 8px 32px 0 rgba(67,206,162,0.10)",
+          }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              Order Summary
+            </Typography>
+            <Card elevation={0} sx={{
+              p: 1,
+              border: '1px solid #e0e0e0',
+              borderRadius: '10px',
+              background: "#f8f9fa"
+            }}>
+              <CardContent sx={{ p: 1 }}>
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Avatar
+                    src={getProductImage(product)}
+                    alt={product.mobileName}
+                    variant="rounded"
+                    sx={{ width: 80, height: 80, bgcolor: "#e0e0e0" }}
+                  />
+                  <Box>
+                    <Typography variant="subtitle1" sx={{
+                      fontWeight: 600,
+                      color: '#222',
+                      mb: 0.5
+                    }}>
+                      {product.mobileName}
+                    </Typography>
+                    <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
+                      <Chip label={`Qty: ${product.quantity}`} size="small" />
+                      <Chip
+                        label={`₹${(product.price * product.quantity).toLocaleString('en-IN')}`}
+                        size="small"
+                        color="primary"
+                      />
+                    </Stack>
+                    {product.discount > 0 && (
+                      <Chip 
+                        label={`${product.discount}% OFF`} 
+                        size="small" 
+                        color="success" 
+                        sx={{ mt: 0.5 }}
+                      />
                     )}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Quantity: {products[0].quantity}
-                  </Typography>
-                </CardContent>
-              </Card>
-            )}
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
           </Paper>
         )}
 
         <Typography variant="h4" gutterBottom sx={{
           fontWeight: 'bold',
           mb: 3,
-          color: '#4527a0'
+          color: '#2d3436'
         }}>
           Select Shipping Address
         </Typography>
 
         {addresses.length === 0 ? (
-          <Paper elevation={3} sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
+          <Paper elevation={3} sx={{ 
+            p: 4, 
+            textAlign: 'center', 
+            borderRadius: '18px',
+            background: "rgba(255,255,255,0.85)",
+            boxShadow: "0 8px 32px 0 rgba(67,206,162,0.10)",
+          }}>
             <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
               No addresses found
             </Typography>
@@ -338,8 +430,8 @@ const ChangeAddressPage = () => {
                     p: 3,
                     mb: 2,
                     borderLeft: address.isDefault ? '6px solid #43cea2' : '6px solid #e0e0e0',
-                    borderRadius: 3,
-                    background: "rgba(255,255,255,0.82)",
+                    borderRadius: '18px',
+                    background: "rgba(255,255,255,0.85)",
                     boxShadow: address.isDefault
                       ? "0 6px 24px 0 rgba(67,206,162,0.15)"
                       : "0 2px 8px 0 rgba(67,206,162,0.07)",
@@ -456,14 +548,19 @@ const ChangeAddressPage = () => {
 
         <Snackbar
           open={snackbar.open}
-          autoHideDuration={6000}
+          autoHideDuration={3000}
           onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          TransitionComponent={(props) => <Slide {...props} direction="up" />}
         >
           <Alert
             onClose={handleCloseSnackbar}
             severity={snackbar.severity}
-            sx={{ width: '100%', borderRadius: 2 }}
+            sx={{
+              width: '100%',
+              borderRadius: "10px",
+              boxShadow: "0 2px 8px rgba(67,206,162,0.15)"
+            }}
           >
             {snackbar.message}
           </Alert>
