@@ -104,7 +104,7 @@ const handleBuyNow = async () => {
     mobileName: product?.mobileName,
     price: product?.price,
     discount: product?.discount,
-    description: product?.description,
+    description: product?.descreption,
     image: productImage || product?.imageUrl, // Fallback to product.imageUrl if productImage is null
     quantity,
     actionType: "buy", // This indicates it's a buy-now flow
