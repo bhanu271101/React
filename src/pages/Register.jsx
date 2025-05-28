@@ -71,7 +71,7 @@ export default function Register() {
         setError("");
         setTimeout(() => {
           navigate("/login");
-        }, 10000);
+        }, 15000);
       }
     } catch (err) {
       if (err.response && err.response.data) {
@@ -131,7 +131,7 @@ export default function Register() {
                 Didn't receive the email? Check your spam folder.
               </p>
               <p className="redirect-notice">
-                You'll be redirected to login page in 10 seconds...
+                You'll be redirected to login page in 15 seconds...
               </p>
             </div>
           ) : (
