@@ -291,7 +291,7 @@ const handleBuyNow = async () => {
                 Product Description
               </Typography>
               <Typography variant="body1" sx={{ whiteSpace: "pre-line", color: "#333" }}>
-                {product.description || "No description available for this product."}
+                {product.descreption || "No description available for this product."}
               </Typography>
             </Box>
 
