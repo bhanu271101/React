@@ -283,14 +283,14 @@ const OrderDetailsPage = () => {
       await axios.delete(`${Orders}/deleteOrder?orderId=${orderId}`);
       setSnackbar({
         open: true,
-        message: "Order deleted successfully",
+        message: "Order Cancelled successfully",
         severity: "success",
       });
       setTimeout(() => navigate("/orderspage"), 1500);
     } catch (error) {
       setSnackbar({
         open: true,
-        message: "Failed to delete order. Please try again.",
+        message: "Failed to cancel order. Please try again.",
         severity: "error",
       });
     } finally {
@@ -399,7 +399,7 @@ const OrderDetailsPage = () => {
               {order.mobileName}
             </Typography>
             <Typography variant="body1" color="text.secondary" paragraph>
-              {order.description || "No description available."}
+              {order.descreption || "No description available."}
             </Typography>
             <Typography variant="body1" sx={{ fontWeight: 600, mt: 2 }}>
               ₹{order.price?.toLocaleString("en-IN") || "N/A"}
